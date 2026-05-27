@@ -1,0 +1,7 @@
+from datetime import datetime
+from decimal import Decimal
+from typing import Literal
+from pydantic import BaseModel, ConfigDict, Field
+class EgresoCasaCreate(BaseModel): id_casa:int; id_periodo:int; id_cuarto:int|None=None; id_servicio_mensual:int|None=None; concepto:str; categoria:Literal["servicio","mantenimiento","reparacion","limpieza","impuesto","otro"]="otro"; monto:Decimal=Field(ge=0); fecha_egreso:datetime|None=None; metodo_pago:str|None=None; numero_comprobante:str|None=None; comprobante:str|None=None; observacion:str|None=None; registrado_por:int
+class EgresoCasaUpdate(BaseModel): id_casa:int|None=None; id_periodo:int|None=None; id_cuarto:int|None=None; concepto:str|None=None; categoria:Literal["servicio","mantenimiento","reparacion","limpieza","impuesto","otro"]|None=None; monto:Decimal|None=Field(default=None,ge=0); fecha_egreso:datetime|None=None; metodo_pago:str|None=None; numero_comprobante:str|None=None; comprobante:str|None=None; observacion:str|None=None; registrado_por:int|None=None
+class EgresoCasaResponse(BaseModel): model_config=ConfigDict(from_attributes=True); id_egreso:int; id_casa:int; id_periodo:int; id_cuarto:int|None=None; id_servicio_mensual:int|None=None; concepto:str; categoria:str; monto:Decimal; fecha_egreso:datetime; metodo_pago:str|None=None; numero_comprobante:str|None=None; comprobante:str|None=None; observacion:str|None=None; registrado_por:int; fecha_creacion:datetime
