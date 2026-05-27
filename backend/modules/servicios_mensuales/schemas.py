@@ -1,0 +1,7 @@
+from datetime import datetime
+from decimal import Decimal
+from typing import Literal
+from pydantic import BaseModel, ConfigDict, Field
+class ServicioMensualCreate(BaseModel): id_periodo:int; id_servicio:int; id_casa:int; id_cuarto:int|None=None; monto:Decimal=Field(ge=0); responsable_pago:Literal["inquilino","propietario"]; estado_pago:Literal["pendiente","pagado","vencido"]="pendiente"; metodo_pago:str|None=None; fecha_pago:datetime|None=None; numero_comprobante:str|None=None; observacion:str|None=None
+class ServicioMensualUpdate(BaseModel): id_periodo:int|None=None; id_servicio:int|None=None; id_casa:int|None=None; id_cuarto:int|None=None; monto:Decimal|None=Field(default=None,ge=0); responsable_pago:Literal["inquilino","propietario"]|None=None; estado_pago:Literal["pendiente","pagado","vencido"]|None=None; metodo_pago:str|None=None; fecha_pago:datetime|None=None; numero_comprobante:str|None=None; observacion:str|None=None
+class ServicioMensualResponse(BaseModel): model_config=ConfigDict(from_attributes=True); id_servicio_mensual:int; id_periodo:int; id_servicio:int; id_casa:int; id_cuarto:int|None=None; monto:Decimal; responsable_pago:str; estado_pago:str; metodo_pago:str|None=None; fecha_pago:datetime|None=None; numero_comprobante:str|None=None; observacion:str|None=None; fecha_creacion:datetime
