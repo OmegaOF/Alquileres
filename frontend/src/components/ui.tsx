@@ -44,7 +44,8 @@ export function Card({ title, description, children, action }: { title?: string;
 }
 
 export function Field({ label, children }: { label: string; children: ReactNode }) { return <div className="field"><label>{label}</label>{children}</div>; }
-export function FormInput({ label, value, onChange, type = "text" }: { label: string; value: any; onChange: (v: string) => void; type?: string }) { return <Field label={formatLabel(label)}><input type={type} value={value ?? ""} placeholder={formatLabel(label)} onChange={(e) => onChange(e.target.value)} /></Field>; }
+export function FormInput({ label, value, onChange, type }: { label: string; value: any; onChange: (v: string) => void; type?: string }) { const inputType = type ?? (label.startsWith("fecha_") ? "date" : "text"); return <Field label={formatLabel(label)}><input type={inputType} value={value ?? ""} placeholder={formatLabel(label)} onChange={(e) => onChange(e.target.value)} /></Field>; }
+export function FormSelect({ label, value, onChange, options }: { label: string; value: any; onChange: (v: string) => void; options: { label: string; value: string }[] }) { return <Field label={formatLabel(label)}><select value={value ?? ""} onChange={(e) => onChange(e.target.value)}>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></Field>; }
 export function ErrorMessage({ message }: { message: string }) { if (!message) return null; return <div className="error-message">{message}</div>; }
 
 export function EmptyState({ title = "No hay registros para mostrar.", description, action, secondaryAction, icon = "✨" }: { title?: string; description?: string; action?: ReactNode; secondaryAction?: ReactNode; icon?: ReactNode }) {
