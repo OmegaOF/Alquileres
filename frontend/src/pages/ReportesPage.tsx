@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { Link, useParams } from "react-router-dom";
 import api from "../lib/api";
+import ContextHelp from "../components/ContextHelp";
 import { Card, ErrorMessage, Field, PageHeader, formatMoney } from "../components/ui";
 
 function ReportMetric({ label, value, money = true }: { label: string; value: any; money?: boolean }) {
@@ -28,16 +30,20 @@ function ReportCards({ data }: { data: any }) {
 }
 
 export default function ReportesPage(){
-  const [idPeriodo,setIdPeriodo]=useState(""); const [idCasa,setIdCasa]=useState(""); const [resumen,setResumen]=useState<any>(null); const [casa,setCasa]=useState<any>(null); const [error,setError]=useState("");
-  const cargarResumen=async()=>{try{setError(""); const {data}=await api.get(`/api/reportes/resumen-periodo/${idPeriodo}`); setResumen(data);}catch(e:any){setError(e?.response?.data?.detail||'Error');}};
-  const cargarCasa=async()=>{try{setError(""); const {data}=await api.get(`/api/reportes/casa/${idCasa}/periodo/${idPeriodo}`); setCasa(data);}catch(e:any){setError(e?.response?.data?.detail||'Error');}};
+  const { idPeriodo } = useParams();
+  const [idPeriodoManual,setIdPeriodoManual]=useState(idPeriodo || ""); const [idCasa,setIdCasa]=useState(""); const [resumen,setResumen]=useState<any>(null); const [casa,setCasa]=useState<any>(null); const [error,setError]=useState(""); const [periodo,setPeriodo]=useState<any>(null);
+  const periodoActivo = idPeriodo || idPeriodoManual;
+  const cargarResumen=async()=>{if(!periodoActivo){setError("Para ver reportes del mes, primero selecciona un periodo."); return;} try{setError(""); const {data}=await api.get(`/api/reportes/resumen-periodo/${periodoActivo}`); setResumen(data);}catch(e:any){setError(e?.response?.data?.detail||'Error');}};
+  const cargarCasa=async()=>{if(!periodoActivo){setError("Para ver reportes del mes, primero selecciona un periodo."); return;} try{setError(""); const {data}=await api.get(`/api/reportes/casa/${idCasa}/periodo/${periodoActivo}`); setCasa(data);}catch(e:any){setError(e?.response?.data?.detail||'Error');}};
+  useEffect(()=>{if(idPeriodo){api.get(`/api/periodos/${idPeriodo}`).then(({data})=>setPeriodo(data)).catch(()=>null); cargarResumen();}},[idPeriodo]);
   return (
     <div className="page">
-      <PageHeader title="Reportes" description="Consulta totales financieros por periodo o por casa sin ver JSON crudo." />
+      <PageHeader title={idPeriodo ? `Reportes de ${periodo?.nombre_periodo || `periodo ${idPeriodo}`}` : "Reportes"} description={idPeriodo ? "Consulta automática del periodo seleccionado." : "Vista general de reportes para consulta manual."} action={idPeriodo && <Link className="btn btn-secondary" to={`/periodos/${idPeriodo}/trabajo-mensual`}>Trabajo mensual</Link>} />
       <ErrorMessage message={error}/>
-      <Card title="Filtros de reporte" description="Ingresa los IDs requeridos y consulta la información.">
+      {!idPeriodo && <ContextHelp message="Para ver reportes del mes, primero selecciona un periodo." to="/periodos" label="Ir a periodos"/>}
+      <Card title="Filtros de reporte" description={idPeriodo ? "El ID de periodo viene de la ruta; opcionalmente filtra por casa." : "Ingresa los IDs requeridos y consulta la información."}>
         <div className="form-grid">
-          <Field label="ID periodo"><input placeholder="Ej. 1" value={idPeriodo} onChange={(e)=>setIdPeriodo(e.target.value)} /></Field>
+          {!idPeriodo && <Field label="ID periodo"><input placeholder="Ej. 1" value={idPeriodoManual} onChange={(e)=>setIdPeriodoManual(e.target.value)} /></Field>}
           <Field label="ID casa"><input placeholder="Ej. 1" value={idCasa} onChange={(e)=>setIdCasa(e.target.value)} /></Field>
         </div>
         <div className="form-actions">
