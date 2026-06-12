@@ -15,6 +15,7 @@ import CobrosPage from "../pages/CobrosPage";
 import PagosPage from "../pages/PagosPage";
 import EgresosPage from "../pages/EgresosPage";
 import ReportesPage from "../pages/ReportesPage";
+import TrabajoMensualPage from "../pages/TrabajoMensualPage";
 
 const wrap = (el: JSX.Element) => <ProtectedRoute><Layout>{el}</Layout></ProtectedRoute>;
 
@@ -26,13 +27,23 @@ export default function AppRoutes() {
       <Route path="/dashboard" element={wrap(<DashboardPage />)} />
       <Route path="/usuarios" element={wrap(<UsuariosPage />)} />
       <Route path="/casas" element={wrap(<CasasPage />)} />
+      <Route path="/casas/:idCasa" element={wrap(<CasasPage />)} />
+      <Route path="/casas/:idCasa/cuartos" element={wrap(<CuartosPage />)} />
+      <Route path="/casas/:idCasa/cuartos/nuevo" element={wrap(<CuartosPage />)} />
       <Route path="/cuartos" element={wrap(<CuartosPage />)} />
+      <Route path="/cuartos/:idCuarto" element={wrap(<CuartosPage />)} />
+      <Route path="/cuartos/:idCuarto/alquileres/nuevo" element={wrap(<AlquileresPage />)} />
       <Route path="/inquilinos" element={wrap(<InquilinosPage />)} />
       <Route path="/alquileres" element={wrap(<AlquileresPage />)} />
       <Route path="/periodos" element={wrap(<PeriodosPage />)} />
+      <Route path="/periodos/:idPeriodo/trabajo-mensual" element={wrap(<TrabajoMensualPage />)} />
+      <Route path="/periodos/:idPeriodo/servicios-mensuales" element={wrap(<ServiciosMensualesPage />)} />
+      <Route path="/periodos/:idPeriodo/cobros" element={wrap(<CobrosPage />)} />
+      <Route path="/periodos/:idPeriodo/reportes" element={wrap(<ReportesPage />)} />
       <Route path="/servicios" element={wrap(<ServiciosPage />)} />
       <Route path="/servicios-mensuales" element={wrap(<ServiciosMensualesPage />)} />
       <Route path="/cobros" element={wrap(<CobrosPage />)} />
+      <Route path="/cobros/:idCobro/pagos/nuevo" element={wrap(<PagosPage />)} />
       <Route path="/pagos" element={wrap(<PagosPage />)} />
       <Route path="/egresos" element={wrap(<EgresosPage />)} />
       <Route path="/reportes" element={wrap(<ReportesPage />)} />
