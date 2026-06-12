@@ -1,15 +1,11 @@
 import { ReactNode } from "react";
-import Navbar from "./Navbar";
-import Sidebar from "./Sidebar";
+import TopNavigation from "./TopNavigation";
 
 export default function Layout({ children }: { children: ReactNode }) {
   return (
     <div className="app-shell">
-      <Navbar />
-      <div className="app-body">
-        <Sidebar />
-        <main className="main-content">{children}</main>
-      </div>
+      <TopNavigation />
+      <main className="main-content">{children}</main>
     </div>
   );
 }

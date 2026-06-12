@@ -14,7 +14,7 @@ export default function DashboardPage(){
   const { user } = useAuth();
   return (
     <div className="page">
-      <PageHeader title="Dashboard" description={`Bienvenido${user?.nombre ? `, ${user.nombre}` : ""}. El sistema está organizado por áreas para guiarte sin memorizar el flujo completo.`} />
+      <PageHeader breadcrumbs={[{ label: "Dashboard" }]} title="Dashboard" description={`Bienvenido${user?.nombre ? `, ${user.nombre}` : ""}. El sistema está organizado por áreas para guiarte sin memorizar el flujo completo.`} />
       <div className="stats-grid">
         <div className="stat-card blue"><span className="stat-label">Áreas de trabajo</span><strong className="stat-value">5</strong></div>
         <div className="stat-card purple"><span className="stat-label">Contexto principal</span><strong className="stat-value" style={{fontSize:"1.35rem"}}>Guiado</strong></div>
