@@ -3,11 +3,17 @@ import { useAuth } from "../contexts/AuthContext";
 export default function Navbar() {
   const { user, logout } = useAuth();
   return (
-    <header style={{ display: "flex", justifyContent: "space-between", padding: 12, background: "#f0f0f0" }}>
-      <strong>Sistema Alquileres</strong>
-      <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-        <span>{user?.nombre} ({user?.rol})</span>
-        <button onClick={logout}>Cerrar sesión</button>
+    <header className="navbar">
+      <div className="brand">
+        <span className="brand-mark">⌂</span>
+        <span>Sistema Alquileres</span>
+      </div>
+      <div className="nav-user">
+        <div className="user-pill">
+          <strong>{user?.nombre || "Usuario"}</strong>
+          <span>{user?.rol || "sesión activa"}</span>
+        </div>
+        <button className="btn btn-secondary btn-sm" onClick={logout}>Cerrar sesión</button>
       </div>
     </header>
   );
