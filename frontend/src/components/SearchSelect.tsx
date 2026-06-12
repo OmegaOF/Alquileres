@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Field } from "./ui";
 
 type SearchSelectProps<T> = {
@@ -13,6 +13,7 @@ type SearchSelectProps<T> = {
   placeholder?: string;
   emptyItemsMessage?: string;
   noResultsMessage?: string;
+  required?: boolean;
 };
 
 export default function SearchSelect<T>({
@@ -27,54 +28,114 @@ export default function SearchSelect<T>({
   placeholder = "Buscar...",
   emptyItemsMessage = "No hay opciones registradas.",
   noResultsMessage = "No se encontraron resultados.",
+  required = false,
 }: SearchSelectProps<T>) {
   const [query, setQuery] = useState("");
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
   const normalizedQuery = query.trim().toLowerCase();
   const filteredItems = useMemo(() => {
-    if (!normalizedQuery) return items;
+    if (!normalizedQuery) return items.slice(0, 5);
     return items.filter((item) => {
       const searchable = getSearchText ? getSearchText(item) : getOptionLabel(item);
       return searchable.toLowerCase().includes(normalizedQuery);
     });
   }, [getOptionLabel, getSearchText, items, normalizedQuery]);
 
+  useEffect(() => {
+    const closeOnClickOutside = (event: MouseEvent) => {
+      if (!containerRef.current?.contains(event.target as Node)) setIsOpen(false);
+    };
+
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsOpen(false);
+    };
+
+    document.addEventListener("mousedown", closeOnClickOutside);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("mousedown", closeOnClickOutside);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, []);
+
   const hasItems = items.length > 0;
+  const showResults = isOpen && !selectedItem;
+  const selectedLabel = selectedItem ? (getSelectedLabel ? getSelectedLabel(selectedItem) : getOptionLabel(selectedItem)) : "";
 
   return (
-    <Field label={label}>
-      <div className="search-select">
-        <input
-          type="search"
-          value={query}
-          placeholder={placeholder}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-        <div className="search-select-results" role="listbox" aria-label={label}>
-          {!hasItems ? (
-            <div className="search-select-message">{emptyItemsMessage}</div>
-          ) : filteredItems.length === 0 ? (
-            <div className="search-select-message">{noResultsMessage}</div>
-          ) : (
-            filteredItems.map((item) => {
-              const key = getKey(item);
-              const selected = selectedItem ? String(getKey(selectedItem)) === String(key) : false;
-              return (
-                <button
-                  type="button"
-                  className={`search-select-option${selected ? " selected" : ""}`}
-                  key={key}
-                  onClick={() => { onSelect(item); setQuery(""); }}
-                >
-                  {getOptionLabel(item)}
-                </button>
-              );
-            })
-          )}
-        </div>
-        {selectedItem && (
-          <div className="search-select-selected">
-            <strong>Seleccionado:</strong> {getSelectedLabel ? getSelectedLabel(selectedItem) : getOptionLabel(selectedItem)}
-            <button type="button" onClick={() => onSelect(null)}>Quitar</button>
+    <Field label={label} required={required}>
+      <div className="search-select" ref={containerRef}>
+        {selectedItem ? (
+          <div className="search-select-selected" aria-live="polite">
+            <span className="search-select-selected-label">Inquilino seleccionado:</span>
+            <strong>{selectedLabel}</strong>
+            <div className="search-select-selected-actions">
+              <button
+                type="button"
+                onClick={() => {
+                  onSelect(null);
+                  setQuery("");
+                  setIsOpen(true);
+                }}
+              >
+                Cambiar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onSelect(null);
+                  setQuery("");
+                  setIsOpen(false);
+                }}
+              >
+                Quitar
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="search-select-control">
+            <input
+              type="search"
+              value={query}
+              placeholder={placeholder}
+              autoComplete="off"
+              aria-expanded={showResults}
+              aria-controls={`${label}-results`}
+              onFocus={() => setIsOpen(true)}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setIsOpen(true);
+              }}
+            />
+            {showResults && (
+              <div className="search-select-results" id={`${label}-results`} role="listbox" aria-label={label}>
+                {!hasItems ? (
+                  <div className="search-select-message">{emptyItemsMessage}</div>
+                ) : filteredItems.length === 0 ? (
+                  <div className="search-select-message">{noResultsMessage}</div>
+                ) : (
+                  filteredItems.map((item) => {
+                    const key = getKey(item);
+                    return (
+                      <button
+                        type="button"
+                        className="search-select-option"
+                        key={key}
+                        onClick={() => {
+                          onSelect(item);
+                          setQuery("");
+                          setIsOpen(false);
+                        }}
+                      >
+                        {getOptionLabel(item)}
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
