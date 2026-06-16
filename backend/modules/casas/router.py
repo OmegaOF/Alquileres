@@ -6,6 +6,10 @@ from modules.casas import schemas, service
 
 router = APIRouter(prefix="/api/casas", tags=["casas"])
 
+@router.get("/resumen", response_model=list[schemas.CasaResumenResponse])
+def list_resumen(db: Session = Depends(get_db), _=Depends(get_current_user)):
+ return service.list_resumen(db)
+
 @router.get("", response_model=list[schemas.CasaResponse])
 def list_items(db: Session = Depends(get_db), _=Depends(get_current_user)): return service.list_items(db)
 @router.post("", response_model=schemas.CasaResponse)
@@ -26,6 +30,10 @@ def delete_item(item_id:int, db: Session = Depends(get_db), _=Depends(get_curren
  if not item: raise HTTPException(404,"No encontrado")
  service.delete_item(db,item)
  return {"ok":True}
+
+@router.get("/{item_id}/cuartos/resumen", response_model=list[schemas.CuartoCasaResumenResponse])
+def cuartos_casa_resumen(item_id:int, db:Session=Depends(get_db), _=Depends(get_current_user)):
+ return service.cuartos_resumen(db,item_id)
 
 @router.get("/{item_id}/cuartos")
 def cuartos_casa(item_id:int, db:Session=Depends(get_db), _=Depends(get_current_user)):

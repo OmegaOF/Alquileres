@@ -13,6 +13,7 @@ from modules.cobros.router import router as cobros_router
 from modules.pagos.router import router as pagos_router
 from modules.egresos.router import router as egresos_router
 from modules.reportes.router import router as reportes_router
+from modules.dashboard.router import router as dashboard_router
 
 from modules.usuarios import models as _u
 from modules.casas import models as _c
@@ -32,5 +33,5 @@ Base.metadata.create_all(bind=engine)
 @app.get('/api/health')
 def health(): return {"ok": True}
 
-for r in [auth_router,usuarios_router,casas_router,cuartos_router,inquilinos_router,alquileres_router,periodos_router,servicios_router,servicios_mensuales_router,cobros_router,pagos_router,egresos_router,reportes_router]:
+for r in [auth_router,usuarios_router,casas_router,cuartos_router,inquilinos_router,alquileres_router,periodos_router,servicios_router,servicios_mensuales_router,cobros_router,pagos_router,egresos_router,reportes_router,dashboard_router]:
     app.include_router(r)

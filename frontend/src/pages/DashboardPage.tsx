@@ -1,35 +1,11 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { useAuth } from "../contexts/AuthContext";
-import { Card, PageHeader } from "../components/ui";
-
-const areas = [
-  { to: "/casas", title: "Propiedades", desc: "Casas, cuartos relacionados y egresos por propiedad.", icon: "🏠" },
-  { to: "/inquilinos", title: "Personas y alquileres", desc: "Inquilinos y contratos creados desde un cuarto libre.", icon: "🤝" },
-  { to: "/periodos", title: "Gestión mensual", desc: "Periodos como centro de servicios, cobros y pagos.", icon: "🗓" },
-  { to: "/reportes", title: "Reportes", desc: "Resultados financieros generales o por periodo.", icon: "📊" },
-  { to: "/servicios", title: "Configuración", desc: "Usuarios y catálogo de servicios reutilizables.", icon: "⚙️" },
-] as const;
-
+import api from "../lib/api";
+import { Card, EmptyState, ErrorMessage, PageHeader, errorMessage, formatMoney } from "../components/ui";
+const meses=["","Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
 export default function DashboardPage(){
-  const { user } = useAuth();
-  return (
-    <div className="page">
-      <PageHeader breadcrumbs={[{ label: "Dashboard" }]} title="Dashboard" description={`Bienvenido${user?.nombre ? `, ${user.nombre}` : ""}. El sistema está organizado por áreas para guiarte sin memorizar el flujo completo.`} />
-      <div className="stats-grid">
-        <div className="stat-card blue"><span className="stat-label">Áreas de trabajo</span><strong className="stat-value">5</strong></div>
-        <div className="stat-card purple"><span className="stat-label">Contexto principal</span><strong className="stat-value" style={{fontSize:"1.35rem"}}>Guiado</strong></div>
-        <div className="stat-card green"><span className="stat-label">Sesión</span><strong className="stat-value">OK</strong></div>
-        <div className="stat-card orange"><span className="stat-label">Rol actual</span><strong className="stat-value" style={{fontSize:"1.35rem"}}>{user?.rol || "—"}</strong></div>
-      </div>
-      <Card title="Áreas del sistema" description="Empieza por el área que corresponde a tu tarea y usa las acciones contextuales.">
-        <div className="quick-grid">
-          {areas.map((area) => <Link key={area.to} className="quick-link" to={area.to}><strong>{area.icon} {area.title}</strong><span>{area.desc}</span></Link>)}
-        </div>
-      </Card>
-      <Card title="Flujos guiados" description="Las acciones principales ahora parten desde la entidad padre correcta.">
-        <div className="flow"><span className="flow-step">Casa</span><span className="flow-arrow">→</span><span className="flow-step">Cuartos de esa casa</span><span className="flow-arrow">→</span><span className="flow-step">Cuarto libre</span><span className="flow-arrow">→</span><span className="flow-step">Alquiler</span></div>
-        <div className="flow" style={{marginTop:12}}><span className="flow-step">Periodo</span><span className="flow-arrow">→</span><span className="flow-step">Trabajo mensual</span><span className="flow-arrow">→</span><span className="flow-step">Cobros</span><span className="flow-arrow">→</span><span className="flow-step">Pagos y reportes</span></div>
-      </Card>
-    </div>
-  );
+  const [data,setData]=useState<any>(null); const [error,setError]=useState("");
+  useEffect(()=>{ api.get("/api/dashboard/resumen").then(r=>setData(r.data)).catch(e=>setError(errorMessage(e))); },[]);
+  const p=data?.periodo;
+  return <div className="page"><PageHeader breadcrumbs={[{label:"INICIO"},{label:"Dashboard"}]} title="Inicio" description="Resumen general del sistema" action={p?<Link className="btn btn-primary" to={`/periodos/${p.id_periodo}/trabajo-mensual`}>Ir al trabajo mensual</Link>:<Link className="btn btn-primary" to="/periodos">Ir a Periodos</Link>} /><ErrorMessage message={error}/>{!data && !error && <Card><EmptyState title="Cargando resumen..." icon="▦" /></Card>}{data && <><Card title={p?`Periodo actual: ${meses[p.mes]} ${p.anio}`:"No hay un periodo abierto."} description={p?`Estado: ${p.estado}`:"Crea o abre un periodo para ver el resumen financiero mensual."}>{p?<Link className="btn btn-primary" to={`/periodos/${p.id_periodo}/trabajo-mensual`}>Ir al trabajo mensual</Link>:<Link className="btn btn-secondary" to="/periodos">Ir a Periodos</Link>}</Card><div className="stats-grid"><div className="stat-card blue"><span className="stat-label">Casas</span><strong className="stat-value">{data.propiedades.total_casas}</strong></div><div className="stat-card purple"><span className="stat-label">Cuartos totales</span><strong className="stat-value">{data.propiedades.total_cuartos}</strong></div><div className="stat-card green"><span className="stat-label">Cuartos libres</span><strong className="stat-value">{data.propiedades.cuartos_libres}</strong></div><div className="stat-card orange"><span className="stat-label">Cuartos ocupados</span><strong className="stat-value">{data.propiedades.cuartos_ocupados}</strong></div><div className="stat-card blue"><span className="stat-label">Alquileres activos</span><strong className="stat-value">{data.propiedades.alquileres_activos}</strong></div></div><Card title="Resumen financiero del periodo" description="Resultado actual = total pagado - total de egresos; resumen operativo no contable definitivo."><div className="stats-grid"><div className="stat-card blue"><span className="stat-label">Total facturado</span><strong className="stat-value">{formatMoney(data.finanzas.total_facturado)}</strong></div><div className="stat-card green"><span className="stat-label">Total pagado</span><strong className="stat-value">{formatMoney(data.finanzas.total_pagado)}</strong></div><div className="stat-card orange"><span className="stat-label">Saldo pendiente</span><strong className="stat-value">{formatMoney(data.finanzas.saldo_pendiente)}</strong></div><div className="stat-card purple"><span className="stat-label">Total de egresos</span><strong className="stat-value">{formatMoney(data.finanzas.total_egresos)}</strong></div><div className="stat-card green"><span className="stat-label">Resultado actual</span><strong className="stat-value">{formatMoney(data.finanzas.resultado_actual)}</strong></div></div></Card><Card title="Estados de cobros"><div className="stats-grid"><div className="stat-card orange"><span className="stat-label">Pendientes</span><strong className="stat-value">{data.cobros.pendientes}</strong></div><div className="stat-card blue"><span className="stat-label">Parciales</span><strong className="stat-value">{data.cobros.parciales}</strong></div><div className="stat-card green"><span className="stat-label">Pagados</span><strong className="stat-value">{data.cobros.pagados}</strong></div><div className="stat-card purple"><span className="stat-label">Atrasados</span><strong className="stat-value">{data.cobros.atrasados}</strong></div></div></Card><Card title="Acciones rápidas"><div className="form-actions"><Link className="btn btn-primary" to="/casas">Ver casas</Link>{p && <Link className="btn btn-primary" to={`/periodos/${p.id_periodo}/trabajo-mensual`}>Ir al periodo actual</Link>}{p && <Link className="btn btn-secondary" to={`/periodos/${p.id_periodo}/cobros`}>Ver cobros del periodo</Link>}<Link className="btn btn-secondary" to={p?`/periodos/${p.id_periodo}/reportes`:"/reportes"}>Ver reportes</Link></div></Card></>}</div>;
 }
