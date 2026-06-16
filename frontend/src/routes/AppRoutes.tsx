@@ -28,9 +28,9 @@ export default function AppRoutes() {
       <Route path="/usuarios" element={wrap(<UsuariosPage />)} />
       <Route path="/casas" element={wrap(<CasasPage />)} />
       <Route path="/casas/:idCasa" element={wrap(<CasasPage />)} />
-      <Route path="/casas/:idCasa/cuartos" element={wrap(<CuartosPage />)} />
+      <Route path="/casas/:idCasa/cuartos" element={<Navigate to=".." replace />} />
       <Route path="/casas/:idCasa/cuartos/nuevo" element={wrap(<CuartosPage />)} />
-      <Route path="/cuartos" element={wrap(<CuartosPage />)} />
+      <Route path="/cuartos" element={<Navigate to="/casas" replace />} />
       <Route path="/cuartos/:idCuarto" element={wrap(<CuartosPage />)} />
       <Route path="/cuartos/:idCuarto/alquileres/nuevo" element={wrap(<AlquileresPage />)} />
       <Route path="/inquilinos" element={wrap(<InquilinosPage />)} />
