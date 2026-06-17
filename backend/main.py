@@ -14,6 +14,7 @@ from modules.pagos.router import router as pagos_router
 from modules.egresos.router import router as egresos_router
 from modules.reportes.router import router as reportes_router
 from modules.dashboard.router import router as dashboard_router
+from schema_migrations import ensure_runtime_schema
 
 from modules.usuarios import models as _u
 from modules.casas import models as _c
@@ -29,6 +30,7 @@ from modules.egresos import models as _e
 
 app = FastAPI(title="Sistema Alquileres")
 Base.metadata.create_all(bind=engine)
+ensure_runtime_schema(engine)
 
 @app.get('/api/health')
 def health(): return {"ok": True}
