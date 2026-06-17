@@ -15,6 +15,13 @@ def get_item(item_id:int, db: Session = Depends(get_db), _=Depends(get_current_u
  item=service.get_item(db,item_id)
  if not item: raise HTTPException(404,"No encontrado")
  return item
+
+@router.get("/{item_id}/detalles", response_model=schemas.CobroDetalleResponse)
+def get_detalles(item_id:int, db: Session = Depends(get_db), _=Depends(get_current_user)):
+ item=service.get_item(db,item_id)
+ if not item: raise HTTPException(404,"No encontrado")
+ item.detalles = service.get_detalles(db,item)
+ return item
 @router.put("/{item_id}", response_model=schemas.CobroMensualResponse)
 def update_item(item_id:int, payload: schemas.CobroMensualUpdate, db: Session = Depends(get_db), _=Depends(get_current_user)):
  item=service.get_item(db,item_id)

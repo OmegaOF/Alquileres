@@ -9,8 +9,8 @@ from modules.casas.models import Casa
 
 def resumen_periodo(db: Session, id_periodo: int):
     if not db.get(PeriodoMensual, id_periodo): raise HTTPException(404, "Periodo no existe")
-    cobros = db.query(CobroMensual).filter(CobroMensual.id_periodo == id_periodo).all()
-    egresos = db.query(EgresoCasa).filter(EgresoCasa.id_periodo == id_periodo).all()
+    cobros = db.query(CobroMensual).filter(CobroMensual.id_periodo == id_periodo, CobroMensual.estado != "anulado").all()
+    egresos = db.query(EgresoCasa).filter(EgresoCasa.id_periodo == id_periodo, EgresoCasa.estado == "activo").all()
     return {
         "id_periodo": id_periodo,
         "total_a_cobrar": float(sum(Decimal(c.total_a_pagar) for c in cobros)),
@@ -28,8 +28,8 @@ def resumen_periodo(db: Session, id_periodo: int):
 def reporte_casa_periodo(db: Session, id_casa: int, id_periodo: int):
     if not db.get(Casa, id_casa): raise HTTPException(404, "Casa no existe")
     if not db.get(PeriodoMensual, id_periodo): raise HTTPException(404, "Periodo no existe")
-    cobros = db.query(CobroMensual).filter(CobroMensual.id_periodo == id_periodo, CobroMensual.id_casa == id_casa).all()
-    egresos = db.query(EgresoCasa).filter(EgresoCasa.id_periodo == id_periodo, EgresoCasa.id_casa == id_casa).all()
+    cobros = db.query(CobroMensual).filter(CobroMensual.id_periodo == id_periodo, CobroMensual.id_casa == id_casa, CobroMensual.estado != "anulado").all()
+    egresos = db.query(EgresoCasa).filter(EgresoCasa.id_periodo == id_periodo, EgresoCasa.id_casa == id_casa, EgresoCasa.estado == "activo").all()
     return {
         "id_casa": id_casa,
         "id_periodo": id_periodo,

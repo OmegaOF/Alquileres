@@ -20,13 +20,6 @@ def update_item(item_id:int, payload: schemas.PagoUpdate, db: Session = Depends(
  item=service.get_item(db,item_id)
  if not item: raise HTTPException(404,"No encontrado")
  return service.update_item(db,item,payload)
-@router.delete("/{item_id}")
-def delete_item(item_id:int, db: Session = Depends(get_db), _=Depends(get_current_user)):
- item=service.get_item(db,item_id)
- if not item: raise HTTPException(404,"No encontrado")
- service.delete_item(db,item)
- return {"ok":True}
-
 @router.post("/{item_id}/anular", response_model=schemas.PagoResponse)
 def anular(item_id:int, db:Session=Depends(get_db), _=Depends(get_current_user)):
  item=service.get_item(db,item_id)

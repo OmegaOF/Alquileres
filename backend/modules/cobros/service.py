@@ -8,6 +8,7 @@ from modules.cuartos.models import Cuarto
 from modules.egresos.models import EgresoCasa
 from modules.inquilinos.models import Inquilino
 from modules.periodos.models import PeriodoMensual
+from modules.periodos.validators import require_periodo_abierto
 from modules.servicios_mensuales.models import ServicioMensual
 
 
@@ -29,24 +30,24 @@ def recalcular_cobro(db: Session, id_cobro: int):
 
 def create_item(db: Session, payload):
     d = payload.model_dump(exclude_unset=True)
+    require_periodo_abierto(db, d["id_periodo"])
     i = CobroMensual(**d)
     i.total_a_pagar = Decimal(i.monto_alquiler) + Decimal(i.monto_servicios) + Decimal(i.deuda_anterior) + Decimal(i.recargos) - Decimal(i.descuentos)
     i.total_pagado = Decimal("0"); i.saldo_pendiente = i.total_a_pagar; i.estado = "pendiente"
     db.add(i); db.commit(); db.refresh(i); return i
 
 def update_item(db: Session, item, payload):
+    require_periodo_abierto(db, item.id_periodo)
     for k,v in payload.model_dump(exclude_unset=True).items(): setattr(item,k,v)
     item.total_a_pagar = Decimal(item.monto_alquiler)+Decimal(item.monto_servicios)+Decimal(item.deuda_anterior)+Decimal(item.recargos)-Decimal(item.descuentos)
     db.commit(); recalcular_cobro(db,item.id_cobro); db.refresh(item); return item
 
-def delete_item(db: Session, item): db.delete(item); db.commit()
+def delete_item(db: Session, item): require_periodo_abierto(db, item.id_periodo); item.estado="anulado"; db.commit()
 
 def generar_periodo(db: Session, id_periodo: int, registrado_por: int):
-    periodo = db.get(PeriodoMensual, id_periodo)
-    if not periodo: raise HTTPException(404, "Periodo no existe")
-    if periodo.estado == "cerrado": raise HTTPException(400, "Periodo cerrado")
+    periodo = require_periodo_abierto(db, id_periodo)
     r={"id_periodo":id_periodo,"cobros_creados":0,"cobros_omitidos":0,"egresos_creados":0,"errores":[]}
-    activos = db.query(Alquiler).filter(Alquiler.estado=="activo").all()
+    activos = db.query(Alquiler).filter(Alquiler.fecha_inicio<=periodo.fecha_fin, ((Alquiler.fecha_fin.is_(None)) | (Alquiler.fecha_fin>=periodo.fecha_inicio)), Alquiler.estado!="anulado").all()
     for a in activos:
         if db.query(CobroMensual).filter(CobroMensual.id_periodo==id_periodo,CobroMensual.id_alquiler==a.id_alquiler).first(): r["cobros_omitidos"]+=1; continue
         cuarto=db.get(Cuarto,a.id_cuarto); inq=db.get(Inquilino,a.id_inquilino)
@@ -61,16 +62,15 @@ def generar_periodo(db: Session, id_periodo: int, registrado_por: int):
         db.add(DetalleCobroMensual(id_cobro=cobro.id_cobro,tipo_concepto="alquiler",concepto="Alquiler mensual",monto=a.monto_alquiler,descripcion="Renta"))
         for s in sm: db.add(DetalleCobroMensual(id_cobro=cobro.id_cobro,tipo_concepto="servicio",concepto=(s.servicio.nombre_servicio if s.servicio else f"Servicio {s.id_servicio}"),monto=s.monto,id_servicio_mensual=s.id_servicio_mensual,descripcion=s.observacion))
         r["cobros_creados"]+=1
-    # egresos desde servicios propietario o cuarto libre/sin alquiler activo
-    servicios=db.query(ServicioMensual).filter(ServicioMensual.id_periodo==id_periodo,ServicioMensual.estado=="activo").all()
+    # egresos automáticos únicamente para servicios a cargo del propietario
+    servicios=db.query(ServicioMensual).filter(ServicioMensual.id_periodo==id_periodo,ServicioMensual.estado=="activo",ServicioMensual.responsable_pago=="propietario").all()
     for s in servicios:
-        if s.responsable_pago!="propietario":
-            if s.id_cuarto and not db.query(Alquiler).filter(Alquiler.id_cuarto==s.id_cuarto,Alquiler.estado=="activo").first():
-                pass
-            else:
-                continue
         if db.query(EgresoCasa).filter(EgresoCasa.id_servicio_mensual==s.id_servicio_mensual).first():
             continue
         db.add(EgresoCasa(id_casa=s.id_casa,id_periodo=s.id_periodo,id_cuarto=s.id_cuarto,id_servicio_mensual=s.id_servicio_mensual,concepto=(s.servicio.nombre_servicio if s.servicio else f"Servicio {s.id_servicio}"),categoria="servicio",monto=s.monto,registrado_por=registrado_por,metodo_pago=s.metodo_pago,numero_comprobante=s.numero_comprobante,observacion=s.observacion))
         r["egresos_creados"]+=1
     db.commit(); return r
+
+
+def get_detalles(db: Session, item):
+    return [d for d in item.detalles if d.tipo_concepto != "servicio" or (d.servicio_mensual and d.servicio_mensual.estado == "activo" and d.servicio_mensual.responsable_pago == "inquilino")]
