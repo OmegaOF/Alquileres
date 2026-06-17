@@ -9,7 +9,7 @@ router = APIRouter(prefix="/api/egresos", tags=["egresos"])
 @router.get("", response_model=list[schemas.EgresoCasaResponse])
 def list_items(db: Session = Depends(get_db), _=Depends(get_current_user)): return service.list_items(db)
 @router.post("", response_model=schemas.EgresoCasaResponse)
-def create_item(payload: schemas.EgresoCasaCreate, db: Session = Depends(get_db), _=Depends(get_current_user)): return service.create_item(db,payload)
+def create_item(payload: schemas.EgresoCasaCreate, db: Session = Depends(get_db), current_user=Depends(get_current_user)): return service.create_item(db,payload,current_user.id_usuario)
 @router.get("/{item_id}", response_model=schemas.EgresoCasaResponse)
 def get_item(item_id:int, db: Session = Depends(get_db), _=Depends(get_current_user)):
  item=service.get_item(db,item_id)
@@ -20,6 +20,11 @@ def update_item(item_id:int, payload: schemas.EgresoCasaUpdate, db: Session = De
  item=service.get_item(db,item_id)
  if not item: raise HTTPException(404,"No encontrado")
  return service.update_item(db,item,payload)
+@router.post("/{item_id}/anular", response_model=schemas.EgresoCasaResponse)
+def anular_item(item_id:int, db: Session = Depends(get_db), _=Depends(get_current_user)):
+ item=service.get_item(db,item_id)
+ if not item: raise HTTPException(404,"No encontrado")
+ return service.anular_item(db,item)
 @router.delete("/{item_id}")
 def delete_item(item_id:int, db: Session = Depends(get_db), _=Depends(get_current_user)):
  item=service.get_item(db,item_id)

@@ -10,6 +10,10 @@ router = APIRouter(prefix="/api/cobros", tags=["cobros"])
 def list_items(db: Session = Depends(get_db), _=Depends(get_current_user)): return service.list_items(db)
 @router.post("", response_model=schemas.CobroMensualResponse)
 def create_item(payload: schemas.CobroMensualCreate, db: Session = Depends(get_db), _=Depends(get_current_user)): return service.create_item(db,payload)
+@router.get("/{item_id}/detalles", response_model=list[schemas.DetalleCobroMensualResponse])
+def detalles(item_id:int, db:Session=Depends(get_db), _=Depends(get_current_user)):
+ return service.detalles_cobro(db,item_id)
+
 @router.get("/{item_id}", response_model=schemas.CobroMensualResponse)
 def get_item(item_id:int, db: Session = Depends(get_db), _=Depends(get_current_user)):
  item=service.get_item(db,item_id)
