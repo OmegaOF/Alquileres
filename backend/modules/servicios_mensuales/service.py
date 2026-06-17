@@ -51,6 +51,7 @@ def _validar(db,d,item=None):
   c=db.get(Cuarto,id_cuarto)
   if not c: raise HTTPException(400,"Cuarto no existe")
   if c.id_casa!=d["id_casa"]: raise HTTPException(400,"Cuarto no pertenece a casa")
+ d.setdefault("pagador_factura", "propietario" if d.get("responsable_pago")=="propietario" else "inquilino_directo")
  if d["responsable_pago"]=="inquilino":
   if not id_cuarto: raise HTTPException(400,MSG_DIST)
   if not _alquiler_activo(db,d["id_periodo"],id_cuarto): raise HTTPException(400,MSG_VACIO)
@@ -69,27 +70,30 @@ def _recalc(db,cobro):
  cobro.estado="pagado" if cobro.saldo_pendiente<=0 else ("parcial" if total_pag>0 else ("atrasado" if cobro.fecha_limite_pago and cobro.fecha_limite_pago<date.today() else "pendiente"))
 
 def _sync_detalle(db,s):
- det=db.query(DetalleCobroMensual).filter(DetalleCobroMensual.id_servicio_mensual==s.id_servicio_mensual).first()
  if s.estado!="activo" or s.responsable_pago!="inquilino":
-  if det:
-   cobro=det.cobro; db.delete(det); db.flush(); _recalc(db,cobro)
+  for old in db.query(DetalleCobroMensual).filter(DetalleCobroMensual.id_servicio_mensual==s.id_servicio_mensual).all():
+   cobro=old.cobro; db.delete(old); db.flush(); _recalc(db,cobro)
   return
  dists=[d for d in s.distribuciones if d.id_alquiler and d.tipo_calculo!="manual_requerido" and Decimal(d.monto_asignado)>0]
  if not dists: return
  nombre=s.servicio.nombre_servicio if s.servicio else f"Servicio {s.id_servicio}"
+ valid_ids={d.id_distribucion_servicio for d in dists}
+ for stale in db.query(DetalleCobroMensual).filter(DetalleCobroMensual.id_servicio_mensual==s.id_servicio_mensual).all():
+  if stale.id_distribucion_servicio not in valid_ids:
+   cobro=stale.cobro; db.delete(stale); db.flush(); _recalc(db,cobro)
  for dist in dists:
   cobro=db.query(CobroMensual).filter(CobroMensual.id_periodo==s.id_periodo,CobroMensual.id_alquiler==dist.id_alquiler).first()
   if not cobro: continue
-  exists=db.query(DetalleCobroMensual).filter(DetalleCobroMensual.id_cobro==cobro.id_cobro,DetalleCobroMensual.id_servicio_mensual==s.id_servicio_mensual).first()
+  exists=db.query(DetalleCobroMensual).filter(DetalleCobroMensual.id_cobro==cobro.id_cobro,DetalleCobroMensual.id_servicio_mensual==s.id_servicio_mensual,DetalleCobroMensual.id_distribucion_servicio==dist.id_distribucion_servicio).first()
   if not exists:
-   db.add(DetalleCobroMensual(id_cobro=cobro.id_cobro,tipo_concepto="servicio",concepto=nombre,monto=dist.monto_asignado,id_servicio_mensual=s.id_servicio_mensual,descripcion=f"{dist.tipo_calculo}; días considerados: {dist.dias_ocupados}"))
+   db.add(DetalleCobroMensual(id_cobro=cobro.id_cobro,tipo_concepto="servicio",concepto=nombre,monto=dist.monto_asignado,id_servicio_mensual=s.id_servicio_mensual,id_distribucion_servicio=dist.id_distribucion_servicio,descripcion=f"{dist.tipo_calculo}; días considerados: {dist.dias_ocupados}"))
   else:
-   exists.concepto=nombre; exists.monto=dist.monto_asignado; exists.descripcion=f"{dist.tipo_calculo}; días considerados: {dist.dias_ocupados}"
+   exists.concepto=nombre; exists.monto=dist.monto_asignado; exists.id_distribucion_servicio=dist.id_distribucion_servicio; exists.descripcion=f"{dist.tipo_calculo}; días considerados: {dist.dias_ocupados}"
   db.flush(); _recalc(db,cobro)
 
 def _sync_egreso(db,s,registrado_por:int):
  eg=db.query(EgresoCasa).filter(EgresoCasa.id_servicio_mensual==s.id_servicio_mensual).first()
- if s.estado!="activo" or s.responsable_pago!="propietario":
+ if s.estado!="activo" or s.pagador_factura!="propietario":
   if eg: eg.estado="anulado"; eg.fecha_anulacion=datetime.utcnow()
   return
  nombre=s.servicio.nombre_servicio if s.servicio else f"Servicio {s.id_servicio}"
@@ -104,11 +108,12 @@ def create_item(db:Session,payload,registrado_por:int):
  d=payload.model_dump(exclude_unset=True); d.setdefault("estado","activo"); _validar(db,d); i=ServicioMensual(**d); db.add(i); db.flush(); recrear_distribuciones_servicio(db,i); _sync(db,i,registrado_por); db.commit(); db.refresh(i); return i
 
 def update_item(db:Session,item,payload,registrado_por:int):
- old_det=db.query(DetalleCobroMensual).filter(DetalleCobroMensual.id_servicio_mensual==item.id_servicio_mensual).first(); old_cobro=old_det.cobro if old_det else None
+ old_cobros=[d.cobro for d in db.query(DetalleCobroMensual).filter(DetalleCobroMensual.id_servicio_mensual==item.id_servicio_mensual).all()]
  d=payload.model_dump(exclude_unset=True); chk={"id_periodo":d.get("id_periodo",item.id_periodo),"id_servicio":d.get("id_servicio",item.id_servicio),"id_casa":d.get("id_casa",item.id_casa),"id_cuarto":d.get("id_cuarto",item.id_cuarto),"responsable_pago":d.get("responsable_pago",item.responsable_pago),"monto":d.get("monto",item.monto)}; _validar(db,chk,item)
  for k,v in d.items(): setattr(item,k,v)
  db.flush(); recrear_distribuciones_servicio(db,item); _sync(db,item,registrado_por);
- if old_cobro: _recalc(db,old_cobro)
+ for old_cobro in old_cobros:
+  if old_cobro: _recalc(db,old_cobro)
  db.commit(); db.refresh(item); return item
 
 def anular_item(db:Session,item,motivo:str|None=None,registrado_por:int|None=None):
@@ -152,4 +157,39 @@ def calcular_distribuciones_servicio(db:Session, s:ServicioMensual):
 def recrear_distribuciones_servicio(db:Session, s:ServicioMensual):
  db.query(DistribucionServicioMensual).filter(DistribucionServicioMensual.id_servicio_mensual==s.id_servicio_mensual).delete()
  for x in calcular_distribuciones_servicio(db,s):
-  db.add(DistribucionServicioMensual(id_servicio_mensual=s.id_servicio_mensual,id_alquiler=x["alquiler"].id_alquiler if x["alquiler"] else None,dias_ocupados=x["dias"],monto_asignado=x["monto"],parte_propietario=x["monto"] if not x["alquiler"] else 0,tipo_calculo=x["tipo"]))
+  db.add(DistribucionServicioMensual(id_servicio_mensual=s.id_servicio_mensual,id_alquiler=x["alquiler"].id_alquiler if x["alquiler"] else None,dias_ocupados=x["dias"],monto_asignado=x["monto"],parte_propietario=x["monto"] if not x["alquiler"] else 0,tipo_calculo=x["tipo"],manual_confirmada="si" if x["tipo"]!="manual_requerido" else "no"))
+
+
+def obtener_distribuciones(db:Session, item_id:int):
+ s=get_item(db,item_id)
+ if not s: raise HTTPException(404,"No encontrado")
+ p=db.get(PeriodoMensual,s.id_periodo); total=Decimal(s.monto).quantize(Decimal('0.01'))
+ dists=s.distribuciones or []
+ asignado=sum(Decimal(d.monto_asignado) for d in dists if d.estado=="vigente")
+ return {"servicio":{"id_servicio_mensual":s.id_servicio_mensual,"id_periodo":s.id_periodo,"id_servicio":s.id_servicio,"id_casa":s.id_casa,"id_cuarto":s.id_cuarto,"monto":float(total),"estado":s.estado,"manual_requerido":any(d.tipo_calculo=="manual_requerido" for d in dists)},"monto_total":float(total),"distribuciones":[{"id_distribucion_servicio":d.id_distribucion_servicio,"id_alquiler":d.id_alquiler,"inquilino":getattr(getattr(d.alquiler,'inquilino',None),'nombre_completo',None),"fecha_inicio":str(d.alquiler.fecha_inicio) if d.alquiler else None,"fecha_fin":str(d.alquiler.fecha_fin) if d.alquiler and d.alquiler.fecha_fin else None,"dias_ocupados":d.dias_ocupados,"monto_sugerido":float(d.monto_asignado),"monto_asignado":float(d.monto_asignado),"parte_propietario":float(d.parte_propietario),"tipo_calculo":d.tipo_calculo,"manual_confirmada":d.manual_confirmada} for d in dists],"resuelto":asignado==total and not any(d.tipo_calculo=="manual_requerido" for d in dists),"diferencia_pendiente":float(total-asignado)}
+
+def guardar_distribuciones(db:Session, item_id:int, payload, registrado_por:int):
+ s=get_item(db,item_id)
+ if not s: raise HTTPException(404,"No encontrado")
+ _periodo_abierto(db,s.id_periodo)
+ if s.estado!="activo": raise HTTPException(400,"El servicio no está activo")
+ p=db.get(PeriodoMensual,s.id_periodo); total=Decimal(s.monto).quantize(Decimal('0.01'))
+ entradas=payload.distribuciones
+ suma=sum(Decimal(str(x.monto_asignado)).quantize(Decimal('0.01')) for x in entradas)
+ if suma!=total:
+  diff=total-suma; raise HTTPException(400,f"La distribución debe sumar exactamente {total} Bs. Actualmente suma {suma} Bs; {'faltan distribuir' if diff>0 else 'sobran'} {abs(diff)} Bs.")
+ old_cobros=[d.cobro for d in db.query(DetalleCobroMensual).filter(DetalleCobroMensual.id_servicio_mensual==s.id_servicio_mensual).all()]
+ db.query(DistribucionServicioMensual).filter(DistribucionServicioMensual.id_servicio_mensual==s.id_servicio_mensual).delete()
+ for x in entradas:
+  aid=x.id_alquiler
+  if aid is not None:
+   a=db.get(Alquiler,aid)
+   if not a or a.id_cuarto!=s.id_cuarto or a.estado=="anulado" or (a.modalidad_alquiler and a.modalidad_alquiler!="mensual") or a.fecha_inicio>p.fecha_fin or (a.fecha_fin and a.fecha_fin<p.fecha_inicio): raise HTTPException(400,"Alquiler inválido para esta distribución")
+   dias=dias_ocupados_en_periodo(a,p); parte=Decimal('0.00'); tipo="manual"
+  else:
+   dias=0; parte=Decimal(str(x.monto_asignado)).quantize(Decimal('0.01')); tipo="propietario_manual"
+  db.add(DistribucionServicioMensual(id_servicio_mensual=s.id_servicio_mensual,id_alquiler=aid,dias_ocupados=dias,monto_asignado=Decimal(str(x.monto_asignado)).quantize(Decimal('0.01')),parte_propietario=parte,tipo_calculo=tipo,manual_confirmada="si"))
+ db.flush(); _sync(db,s,registrado_por)
+ for c in old_cobros:
+  if c: _recalc(db,c)
+ db.commit(); return obtener_distribuciones(db,item_id)

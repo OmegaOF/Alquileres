@@ -39,10 +39,12 @@ class DetalleCobroMensual(Base):
     concepto: Mapped[str] = mapped_column(String(120), nullable=False)
     monto: Mapped[float] = mapped_column(Numeric(10,2), nullable=False)
     id_servicio_mensual: Mapped[int | None] = mapped_column(ForeignKey("servicios_mensuales.id_servicio_mensual"))
+    id_distribucion_servicio: Mapped[int | None] = mapped_column(ForeignKey("distribuciones_servicios_mensuales.id_distribucion_servicio"))
     descripcion: Mapped[str | None] = mapped_column(Text)
     cobro = relationship("CobroMensual", back_populates="detalles")
     pagos = relationship("Pago", back_populates="detalle_cobro")
-    servicio_mensual = relationship("ServicioMensual", back_populates="detalle_cobro")
+    servicio_mensual = relationship("ServicioMensual", back_populates="detalles_cobro")
+    distribucion_servicio = relationship("DistribucionServicioMensual")
 
     @property
     def id_detalle(self):
