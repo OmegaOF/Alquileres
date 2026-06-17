@@ -43,3 +43,7 @@ class DetalleCobroMensual(Base):
     cobro = relationship("CobroMensual", back_populates="detalles")
     pagos = relationship("Pago", back_populates="detalle_cobro")
     servicio_mensual = relationship("ServicioMensual", back_populates="detalle_cobro")
+
+    @property
+    def id_detalle(self):
+        return self.id_detalle_cobro

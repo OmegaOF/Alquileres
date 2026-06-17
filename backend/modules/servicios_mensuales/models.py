@@ -24,5 +24,21 @@ class ServicioMensual(Base):
     servicio = relationship("Servicio", back_populates="servicios_mensuales")
     casa = relationship("Casa", back_populates="servicios_mensuales")
     cuarto = relationship("Cuarto", back_populates="servicios_mensuales")
-    detalle_cobro = relationship("DetalleCobroMensual", back_populates="servicio_mensual", uselist=False)
+    detalle_cobro = relationship("DetalleCobroMensual", back_populates="servicio_mensual")
     egreso = relationship("EgresoCasa", back_populates="servicio_mensual", uselist=False)
+    distribuciones = relationship("DistribucionServicioMensual", back_populates="servicio_mensual")
+
+class DistribucionServicioMensual(Base):
+    __tablename__ = "distribuciones_servicios_mensuales"
+    id_distribucion_servicio: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    id_servicio_mensual: Mapped[int] = mapped_column(ForeignKey("servicios_mensuales.id_servicio_mensual"), nullable=False)
+    id_alquiler: Mapped[int | None] = mapped_column(ForeignKey("alquileres.id_alquiler"))
+    dias_ocupados: Mapped[int] = mapped_column(Integer, default=0)
+    monto_asignado: Mapped[float] = mapped_column(Numeric(10,2), default=0)
+    parte_propietario: Mapped[float] = mapped_column(Numeric(10,2), default=0)
+    tipo_calculo: Mapped[str] = mapped_column(String(30), default="proporcional")
+    estado: Mapped[str] = mapped_column(String(20), default="vigente")
+    observacion: Mapped[str | None] = mapped_column(Text)
+    fecha_creacion: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    servicio_mensual = relationship("ServicioMensual", back_populates="distribuciones")
+    alquiler = relationship("Alquiler")
