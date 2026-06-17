@@ -1,10 +1,10 @@
 from datetime import datetime, date
 from decimal import Decimal
 from fastapi import HTTPException
-from sqlalchemy import and_
 from sqlalchemy.orm import Session
 from modules.servicios_mensuales.models import ServicioMensual
 from modules.periodos.models import PeriodoMensual
+from modules.periodos.validators import require_periodo_abierto
 from modules.servicios.models import Servicio
 from modules.casas.models import Casa
 from modules.cuartos.models import Cuarto
@@ -24,10 +24,7 @@ def list_items(db:Session, id_periodo:int|None=None):
 def get_item(db:Session,item_id:int): return db.get(ServicioMensual,item_id)
 
 def _periodo_abierto(db,id_periodo):
- p=db.get(PeriodoMensual,id_periodo)
- if not p: raise HTTPException(400,"Periodo no existe")
- if p.estado=="cerrado": raise HTTPException(400,"Periodo cerrado")
- return p
+ return require_periodo_abierto(db,id_periodo)
 
 def _servicio_activo(db,id_servicio):
  s=db.get(Servicio,id_servicio)
@@ -36,7 +33,14 @@ def _servicio_activo(db,id_servicio):
  return s
 
 def _alquiler_activo(db,id_periodo,id_cuarto):
- return db.query(Alquiler).filter(Alquiler.id_cuarto==id_cuarto,Alquiler.estado=="activo").order_by(Alquiler.fecha_inicio.desc(),Alquiler.id_alquiler.desc()).first()
+ p=db.get(PeriodoMensual,id_periodo)
+ if not p: raise HTTPException(400,"Periodo no existe")
+ return db.query(Alquiler).filter(
+  Alquiler.id_cuarto==id_cuarto,
+  Alquiler.fecha_inicio<=p.fecha_fin,
+  ((Alquiler.fecha_fin.is_(None)) | (Alquiler.fecha_fin>=p.fecha_inicio)),
+  Alquiler.estado!="anulado",
+ ).order_by(Alquiler.fecha_inicio.desc(),Alquiler.id_alquiler.desc()).first()
 
 def _validar(db,d,item=None):
  _periodo_abierto(db,d["id_periodo"]); servicio=_servicio_activo(db,d["id_servicio"])
@@ -56,7 +60,7 @@ def _validar(db,d,item=None):
  return servicio
 
 def _recalc(db,cobro):
- total_serv=sum(Decimal(x.monto) for x in db.query(DetalleCobroMensual).filter(DetalleCobroMensual.id_cobro==cobro.id_cobro,DetalleCobroMensual.tipo_concepto=="servicio").all())
+ total_serv=sum(Decimal(x.monto) for x in db.query(DetalleCobroMensual).filter(DetalleCobroMensual.id_cobro==cobro.id_cobro,DetalleCobroMensual.tipo_concepto=="servicio").all() if x.servicio_mensual and x.servicio_mensual.estado=="activo" and x.servicio_mensual.responsable_pago=="inquilino")
  total_pag=sum(Decimal(x.monto_pagado) for x in db.query(Pago).filter(Pago.id_cobro==cobro.id_cobro,Pago.estado=="valido").all())
  total=Decimal(cobro.monto_alquiler)+total_serv+Decimal(cobro.deuda_anterior)+Decimal(cobro.recargos)-Decimal(cobro.descuentos)
  if total < total_pag: raise HTTPException(400,"Existen pagos registrados que impiden reducir el total del cobro por debajo de lo pagado")
@@ -106,7 +110,7 @@ def update_item(db:Session,item,payload,registrado_por:int):
  if old_cobro: _recalc(db,old_cobro)
  db.commit(); db.refresh(item); return item
 
-def anular_item(db:Session,item,motivo:str|None=None):
- _periodo_abierto(db,item.id_periodo); item.estado="anulado"; item.fecha_anulacion=datetime.utcnow(); item.motivo_anulacion=motivo; db.flush(); _sync(db,item,0); db.commit(); db.refresh(item); return item
+def anular_item(db:Session,item,motivo:str|None=None,registrado_por:int|None=None):
+ _periodo_abierto(db,item.id_periodo); item.estado="anulado"; item.fecha_anulacion=datetime.utcnow(); item.motivo_anulacion=motivo; db.flush(); _sync(db,item,registrado_por or 1); db.commit(); db.refresh(item); return item
 
-def delete_item(db:Session,item): return anular_item(db,item)
+def delete_item(db:Session,item,registrado_por:int|None=None): return anular_item(db,item,registrado_por=registrado_por)

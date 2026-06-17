@@ -24,10 +24,10 @@ def update_item(item_id:int, payload: schemas.ServicioMensualUpdate, db: Session
 def anular_item(item_id:int, motivo: str | None = None, db: Session = Depends(get_db), _=Depends(get_current_user)):
  item=service.get_item(db,item_id)
  if not item: raise HTTPException(404,"No encontrado")
- return service.anular_item(db,item,motivo)
+ return service.anular_item(db,item,motivo,current_user.id_usuario)
 @router.delete("/{item_id}")
-def delete_item(item_id:int, db: Session = Depends(get_db), _=Depends(get_current_user)):
+def delete_item(item_id:int, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
  item=service.get_item(db,item_id)
  if not item: raise HTTPException(404,"No encontrado")
- service.delete_item(db,item)
+ service.delete_item(db,item,current_user.id_usuario)
  return {"ok":True}
