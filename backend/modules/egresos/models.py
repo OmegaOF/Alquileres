@@ -18,6 +18,8 @@ class EgresoCasa(Base):
     comprobante: Mapped[str | None] = mapped_column(String(255))
     observacion: Mapped[str | None] = mapped_column(Text)
     registrado_por: Mapped[int] = mapped_column(ForeignKey("usuarios.id_usuario"), nullable=False)
+    estado: Mapped[str] = mapped_column(String(20), default="activo")
+    fecha_anulacion: Mapped[datetime | None] = mapped_column(DateTime)
     fecha_creacion: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     casa = relationship("Casa", back_populates="egresos")
     periodo = relationship("PeriodoMensual", back_populates="egresos")

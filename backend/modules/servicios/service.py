@@ -14,4 +14,8 @@ def update_item(db:Session,item,payload):
   if dup: raise HTTPException(400,"Servicio duplicado")
  for k,v in d.items(): setattr(item,k,v)
  db.commit(); db.refresh(item); return item
-def delete_item(db:Session,item): db.delete(item); db.commit()
+def delete_item(db:Session,item):
+ from modules.servicios_mensuales.models import ServicioMensual
+ if db.query(ServicioMensual).filter(ServicioMensual.id_servicio==item.id_servicio).first():
+  item.estado="inactivo"; db.commit(); db.refresh(item); return item
+ db.delete(item); db.commit(); return None
