@@ -51,12 +51,14 @@ def generar_periodo(db: Session, id_periodo: int, registrado_por: int):
     activos = db.query(Alquiler).filter(Alquiler.fecha_inicio<=periodo.fecha_fin, ((Alquiler.fecha_fin.is_(None)) | (Alquiler.fecha_fin>=periodo.fecha_inicio)), Alquiler.estado!="anulado").all()
     try:
       for a in activos:
-        if db.query(CobroMensual).filter(CobroMensual.id_periodo==id_periodo,CobroMensual.id_alquiler==a.id_alquiler).first(): r["cobros_omitidos"]+=1; continue
+        modalidad=a.modalidad_alquiler or "mensual"
+        if modalidad=="diario" and not (periodo.fecha_inicio<=a.fecha_inicio<=periodo.fecha_fin):
+          r["cobros_omitidos"]+=1; continue
+        if db.query(CobroMensual).filter(CobroMensual.id_alquiler==a.id_alquiler).first() if modalidad=="diario" else db.query(CobroMensual).filter(CobroMensual.id_periodo==id_periodo,CobroMensual.id_alquiler==a.id_alquiler).first(): r["cobros_omitidos"]+=1; continue
         cuarto=db.get(Cuarto,a.id_cuarto); inq=db.get(Inquilino,a.id_inquilino)
         if not cuarto or not inq: r["errores"].append(f"alquiler {a.id_alquiler} sin cuarto/inquilino"); continue
         deuda=sum(Decimal(c.saldo_pendiente) for c in db.query(CobroMensual).filter(CobroMensual.id_alquiler==a.id_alquiler,CobroMensual.saldo_pendiente>0,CobroMensual.id_periodo!=id_periodo).all())
         dia=min(max(a.dia_pago,1),28); limite=date(periodo.anio,periodo.mes,dia)
-        modalidad=a.modalidad_alquiler or "mensual"
         monto_alquiler=Decimal(a.total_alquiler_diario or a.monto_alquiler) if modalidad=="diario" else Decimal(a.monto_mensual or a.monto_alquiler)
         detalles=[DetalleCobroMensual(tipo_concepto="alquiler_diario" if modalidad=="diario" else "alquiler",concepto="Alquiler diario" if modalidad=="diario" else "Alquiler mensual",monto=monto_alquiler,descripcion="Servicios básicos incluidos" if modalidad=="diario" else "Renta mensual completa")]
         monto_serv=Decimal('0.00')
@@ -69,7 +71,7 @@ def generar_periodo(db: Session, id_periodo: int, registrado_por: int):
               continue
             for dist in [d for d in s.distribuciones if d.id_alquiler==a.id_alquiler and Decimal(d.monto_asignado)>0]:
               monto_serv+=Decimal(dist.monto_asignado)
-              detalles.append(DetalleCobroMensual(tipo_concepto="servicio",concepto=(s.servicio.nombre_servicio if s.servicio else f"Servicio {s.id_servicio}"),monto=dist.monto_asignado,id_servicio_mensual=s.id_servicio_mensual,descripcion=f"{dist.tipo_calculo}; días considerados: {dist.dias_ocupados}"))
+              detalles.append(DetalleCobroMensual(tipo_concepto="servicio",concepto=(s.servicio.nombre_servicio if s.servicio else f"Servicio {s.id_servicio}"),monto=dist.monto_asignado,id_servicio_mensual=s.id_servicio_mensual,id_distribucion_servicio=dist.id_distribucion_servicio,descripcion=f"{dist.tipo_calculo}; días considerados: {dist.dias_ocupados}"))
         total=monto_alquiler+monto_serv+deuda
         cobro=CobroMensual(id_periodo=id_periodo,id_alquiler=a.id_alquiler,id_casa=cuarto.id_casa,id_cuarto=cuarto.id_cuarto,id_inquilino=inq.id_inquilino,monto_alquiler=monto_alquiler,monto_servicios=monto_serv,deuda_anterior=deuda,descuentos=0,recargos=0,total_a_pagar=total,total_pagado=0,saldo_pendiente=total,fecha_limite_pago=limite,estado="pendiente")
         db.add(cobro); db.flush()
@@ -77,7 +79,7 @@ def generar_periodo(db: Session, id_periodo: int, registrado_por: int):
         r["cobros_creados"]+=1
       if r["errores"]:
         db.rollback(); return r
-      servicios=db.query(ServicioMensual).filter(ServicioMensual.id_periodo==id_periodo,ServicioMensual.estado=="activo",ServicioMensual.responsable_pago=="propietario").all()
+      servicios=db.query(ServicioMensual).filter(ServicioMensual.id_periodo==id_periodo,ServicioMensual.estado=="activo",ServicioMensual.pagador_factura=="propietario").all()
       for s in servicios:
         if db.query(EgresoCasa).filter(EgresoCasa.id_servicio_mensual==s.id_servicio_mensual).first(): continue
         db.add(EgresoCasa(id_casa=s.id_casa,id_periodo=s.id_periodo,id_cuarto=s.id_cuarto,id_servicio_mensual=s.id_servicio_mensual,concepto=(s.servicio.nombre_servicio if s.servicio else f"Servicio {s.id_servicio}"),categoria="servicio",monto=s.monto,registrado_por=registrado_por,metodo_pago=s.metodo_pago,numero_comprobante=s.numero_comprobante,observacion=s.observacion))

@@ -11,6 +11,9 @@ class ServicioMensual(Base):
     id_cuarto: Mapped[int | None] = mapped_column(ForeignKey("cuartos.id_cuarto"))
     monto: Mapped[float] = mapped_column(Numeric(10,2), nullable=False)
     responsable_pago: Mapped[str] = mapped_column(String(20), default="inquilino")
+    # pagador_factura: quien hizo el desembolso real (propietario o inquilino_directo).
+    # responsable_pago queda como compatibilidad histórica y representa el destino de cobro inicial.
+    pagador_factura: Mapped[str] = mapped_column(String(30), default="propietario")
     estado_pago: Mapped[str] = mapped_column(String(20), default="pendiente")
     metodo_pago: Mapped[str | None] = mapped_column(String(40))
     fecha_pago: Mapped[datetime | None] = mapped_column(DateTime)
@@ -24,7 +27,8 @@ class ServicioMensual(Base):
     servicio = relationship("Servicio", back_populates="servicios_mensuales")
     casa = relationship("Casa", back_populates="servicios_mensuales")
     cuarto = relationship("Cuarto", back_populates="servicios_mensuales")
-    detalle_cobro = relationship("DetalleCobroMensual", back_populates="servicio_mensual")
+    detalles_cobro = relationship("DetalleCobroMensual", back_populates="servicio_mensual")
+    detalle_cobro = detalles_cobro  # alias temporal de compatibilidad
     egreso = relationship("EgresoCasa", back_populates="servicio_mensual", uselist=False)
     distribuciones = relationship("DistribucionServicioMensual", back_populates="servicio_mensual")
 
@@ -37,6 +41,7 @@ class DistribucionServicioMensual(Base):
     monto_asignado: Mapped[float] = mapped_column(Numeric(10,2), default=0)
     parte_propietario: Mapped[float] = mapped_column(Numeric(10,2), default=0)
     tipo_calculo: Mapped[str] = mapped_column(String(30), default="proporcional")
+    manual_confirmada: Mapped[str] = mapped_column(String(2), default="no")
     estado: Mapped[str] = mapped_column(String(20), default="vigente")
     observacion: Mapped[str | None] = mapped_column(Text)
     fecha_creacion: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
