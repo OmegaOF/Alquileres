@@ -9,6 +9,10 @@ class AlquilerCreate(BaseModel):
     fecha_inicio:date
     fecha_fin:date|None=None
     monto_alquiler:Decimal=Field(ge=0)
+    modalidad_alquiler:Literal["mensual","diario"]="mensual"
+    monto_mensual:Decimal|None=Field(default=None, ge=0)
+    precio_diario:Decimal|None=Field(default=None, ge=0)
+    total_alquiler_diario:Decimal|None=Field(default=None, ge=0)
     dia_pago:int=Field(ge=1,le=31)
     garantia:Decimal|None=Field(default=None, ge=0)
     estado:Literal["activo","finalizado","cancelado"]="activo"
@@ -20,6 +24,10 @@ class AlquilerUpdate(BaseModel):
     fecha_inicio:date|None=None
     fecha_fin:date|None=None
     monto_alquiler:Decimal|None=Field(default=None, ge=0)
+    modalidad_alquiler:Literal["mensual","diario"]|None=None
+    monto_mensual:Decimal|None=Field(default=None, ge=0)
+    precio_diario:Decimal|None=Field(default=None, ge=0)
+    total_alquiler_diario:Decimal|None=Field(default=None, ge=0)
     dia_pago:int|None=Field(default=None, ge=1, le=31)
     garantia:Decimal|None=Field(default=None, ge=0)
     estado:Literal["activo","finalizado","cancelado"]|None=None
@@ -33,6 +41,10 @@ class AlquilerResponse(BaseModel):
     fecha_inicio:date
     fecha_fin:date|None=None
     monto_alquiler:Decimal
+    modalidad_alquiler:str="mensual"
+    monto_mensual:Decimal|None=None
+    precio_diario:Decimal|None=None
+    total_alquiler_diario:Decimal|None=None
     dia_pago:int
     garantia:Decimal|None=None
     estado:str

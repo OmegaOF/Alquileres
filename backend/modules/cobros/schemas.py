@@ -8,6 +8,7 @@ class CobroMensualResponse(BaseModel): model_config=ConfigDict(from_attributes=T
 
 class DetalleCobroMensualResponse(BaseModel):
     model_config=ConfigDict(from_attributes=True)
+    id_detalle_cobro:int
     id_detalle:int
     id_cobro:int
     tipo_concepto:str
