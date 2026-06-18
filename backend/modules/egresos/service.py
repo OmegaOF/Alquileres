@@ -6,9 +6,15 @@ from modules.periodos.models import PeriodoMensual
 from modules.periodos.validators import require_periodo_abierto
 from modules.cuartos.models import Cuarto
 from modules.usuarios.models import Usuario
+from modules.servicios_mensuales.models import ServicioMensual
 def list_items(db:Session): return db.query(EgresoCasa).all()
 def get_item(db:Session,item_id:int): return db.get(EgresoCasa,item_id)
-def _val(db,d):
+def _val(db,d, item=None):
+ if d.get("id_servicio_mensual") is not None:
+  sm=db.get(ServicioMensual,d["id_servicio_mensual"])
+  if not sm: raise HTTPException(400,"Servicio mensual no existe")
+  if item is None or getattr(item,"id_servicio_mensual",None) != d["id_servicio_mensual"]: raise HTTPException(400,"Los egresos manuales no pueden asociarse arbitrariamente a servicios mensuales")
+  if d.get("id_casa", getattr(item,"id_casa",None)) != sm.id_casa or d.get("id_periodo", getattr(item,"id_periodo",None)) != sm.id_periodo or d.get("id_cuarto", getattr(item,"id_cuarto",None)) != sm.id_cuarto: raise HTTPException(400,"El egreso no coincide con el servicio mensual asociado")
  if "id_casa" in d and not db.get(Casa,d["id_casa"]): raise HTTPException(400,"Casa no existe")
  if "id_periodo" in d:
   require_periodo_abierto(db,d["id_periodo"])
@@ -18,5 +24,5 @@ def _val(db,d):
   if c.id_casa!=d.get("id_casa",c.id_casa): raise HTTPException(400,"Cuarto no pertenece a casa")
  if "registrado_por" in d and not db.get(Usuario,d["registrado_por"]): raise HTTPException(400,"Usuario registrador no existe")
 def create_item(db:Session,payload,registrado_por:int): d=payload.model_dump(exclude_unset=True); d["registrado_por"]=registrado_por; _val(db,d); i=EgresoCasa(**d); db.add(i); db.commit(); db.refresh(i); return i
-def update_item(db:Session,item,payload,registrado_por:int): d=payload.model_dump(exclude_unset=True); d.pop("registrado_por",None); chk={"id_casa":d.get("id_casa",item.id_casa),"id_periodo":d.get("id_periodo",item.id_periodo),"id_cuarto":d.get("id_cuarto",item.id_cuarto),"registrado_por":item.registrado_por or registrado_por}; _val(db,chk); [setattr(item,k,v) for k,v in d.items()]; db.commit(); db.refresh(item); return item
+def update_item(db:Session,item,payload,registrado_por:int): d=payload.model_dump(exclude_unset=True); d.pop("registrado_por",None); chk={"id_casa":d.get("id_casa",item.id_casa),"id_periodo":d.get("id_periodo",item.id_periodo),"id_cuarto":d.get("id_cuarto",item.id_cuarto),"registrado_por":item.registrado_por or registrado_por}; _val(db,{**chk, **({"id_servicio_mensual": item.id_servicio_mensual} if item.id_servicio_mensual else {})}, item); d.pop("id_servicio_mensual",None); [setattr(item,k,v) for k,v in d.items()]; db.commit(); db.refresh(item); return item
 def delete_item(db:Session,item): require_periodo_abierto(db,item.id_periodo); item.estado="anulado"; db.commit(); db.refresh(item); return item

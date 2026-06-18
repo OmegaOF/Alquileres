@@ -179,12 +179,13 @@ def guardar_distribuciones(db:Session, item_id:int, payload, registrado_por:int)
  if suma!=total:
   diff=total-suma; raise HTTPException(400,f"La distribución debe sumar exactamente {total} Bs. Actualmente suma {suma} Bs; {'faltan distribuir' if diff>0 else 'sobran'} {abs(diff)} Bs.")
  old_cobros=[d.cobro for d in db.query(DetalleCobroMensual).filter(DetalleCobroMensual.id_servicio_mensual==s.id_servicio_mensual).all()]
+ permitidos={x["alquiler"].id_alquiler for x in calcular_distribuciones_servicio(db,s) if x["alquiler"]}
  db.query(DistribucionServicioMensual).filter(DistribucionServicioMensual.id_servicio_mensual==s.id_servicio_mensual).delete()
  for x in entradas:
   aid=x.id_alquiler
   if aid is not None:
    a=db.get(Alquiler,aid)
-   if not a or a.id_cuarto!=s.id_cuarto or a.estado=="anulado" or (a.modalidad_alquiler and a.modalidad_alquiler!="mensual") or a.fecha_inicio>p.fecha_fin or (a.fecha_fin and a.fecha_fin<p.fecha_inicio): raise HTTPException(400,"Alquiler inválido para esta distribución")
+   if aid not in permitidos or not a or a.id_cuarto!=s.id_cuarto or a.estado=="anulado" or (a.modalidad_alquiler and a.modalidad_alquiler!="mensual") or a.fecha_inicio>p.fecha_fin or (a.fecha_fin and a.fecha_fin<p.fecha_inicio): raise HTTPException(400,"Alquiler inválido para esta distribución")
    dias=dias_ocupados_en_periodo(a,p); parte=Decimal('0.00'); tipo="manual"
   else:
    dias=0; parte=Decimal(str(x.monto_asignado)).quantize(Decimal('0.01')); tipo="propietario_manual"
