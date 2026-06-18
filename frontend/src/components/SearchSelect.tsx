@@ -14,6 +14,9 @@ type SearchSelectProps<T> = {
   emptyItemsMessage?: string;
   noResultsMessage?: string;
   required?: boolean;
+  disabled?: boolean;
+  disabledMessage?: string;
+  selectedLabelPrefix?: string;
 };
 
 export default function SearchSelect<T>({
@@ -29,6 +32,9 @@ export default function SearchSelect<T>({
   emptyItemsMessage = "No hay opciones registradas.",
   noResultsMessage = "No se encontraron resultados.",
   required = false,
+  disabled = false,
+  disabledMessage = "Selecciona primero el contexto requerido.",
+  selectedLabelPrefix = "Registro seleccionado:",
 }: SearchSelectProps<T>) {
   const [query, setQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
@@ -61,7 +67,7 @@ export default function SearchSelect<T>({
   }, []);
 
   const hasItems = items.length > 0;
-  const showResults = isOpen && !selectedItem;
+  const showResults = isOpen && !selectedItem && !disabled;
   const selectedLabel = selectedItem ? (getSelectedLabel ? getSelectedLabel(selectedItem) : getOptionLabel(selectedItem)) : "";
 
   return (
@@ -69,12 +75,14 @@ export default function SearchSelect<T>({
       <div className="search-select" ref={containerRef}>
         {selectedItem ? (
           <div className="search-select-selected" aria-live="polite">
-            <span className="search-select-selected-label">Inquilino seleccionado:</span>
+            <span className="search-select-selected-label">{selectedLabelPrefix}</span>
             <strong>{selectedLabel}</strong>
             <div className="search-select-selected-actions">
               <button
                 type="button"
+                disabled={disabled}
                 onClick={() => {
+                  if (disabled) return;
                   onSelect(null);
                   setQuery("");
                   setIsOpen(true);
@@ -84,7 +92,9 @@ export default function SearchSelect<T>({
               </button>
               <button
                 type="button"
+                disabled={disabled}
                 onClick={() => {
+                  if (disabled) return;
                   onSelect(null);
                   setQuery("");
                   setIsOpen(false);
@@ -103,12 +113,14 @@ export default function SearchSelect<T>({
               autoComplete="off"
               aria-expanded={showResults}
               aria-controls={`${label}-results`}
-              onFocus={() => setIsOpen(true)}
+              disabled={disabled}
+              onFocus={() => !disabled && setIsOpen(true)}
               onChange={(e) => {
                 setQuery(e.target.value);
-                setIsOpen(true);
+                setIsOpen(!disabled);
               }}
             />
+            {disabled && <div className="search-select-message">{disabledMessage}</div>}
             {showResults && (
               <div className="search-select-results" id={`${label}-results`} role="listbox" aria-label={label}>
                 {!hasItems ? (

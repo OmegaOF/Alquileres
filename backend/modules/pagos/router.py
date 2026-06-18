@@ -9,7 +9,7 @@ router = APIRouter(prefix="/api/pagos", tags=["pagos"])
 @router.get("", response_model=list[schemas.PagoResponse])
 def list_items(db: Session = Depends(get_db), _=Depends(get_current_user)): return service.list_items(db)
 @router.post("", response_model=schemas.PagoResponse)
-def create_item(payload: schemas.PagoCreate, db: Session = Depends(get_db), _=Depends(get_current_user)): return service.create_item(db,payload)
+def create_item(payload: schemas.PagoCreate, db: Session = Depends(get_db), current_user=Depends(get_current_user)): return service.create_item(db,payload,current_user.id_usuario)
 @router.get("/{item_id}", response_model=schemas.PagoResponse)
 def get_item(item_id:int, db: Session = Depends(get_db), _=Depends(get_current_user)):
  item=service.get_item(db,item_id)

@@ -9,9 +9,9 @@ const toNum = (v: string) => (v === "" ? null : Number(v));
 const initialForm = { id_inquilino: "", id_cuarto: "", modalidad_alquiler: "mensual", fecha_inicio: "", fecha_fin: "", monto_alquiler: "", monto_mensual: "", precio_diario: "", dia_pago: "1", garantia: "", estado: "activo", observacion: "" };
 const requiredFields = new Set(["fecha_inicio", "monto_alquiler", "monto_mensual", "precio_diario", "dia_pago"]);
 
-const inquilinoLabel = (inquilino: any) => `${inquilino.nombre || `Inquilino #${inquilino.id_inquilino}`} — CI ${inquilino.ci || "sin CI"} — Tel. ${inquilino.telefono || "sin teléfono"}`;
-const inquilinoSelectedLabel = (inquilino: any) => `${inquilino.nombre || `Inquilino #${inquilino.id_inquilino}`} — CI ${inquilino.ci || "sin CI"} — Tel. ${inquilino.telefono || "sin teléfono"}`;
-const inquilinoSearchText = (inquilino: any) => [inquilino.id_inquilino, inquilino.nombre, inquilino.ci, inquilino.telefono, inquilino.correo].filter(Boolean).join(" ");
+const inquilinoLabel = (inquilino: any) => `${inquilino.nombre || `Inquilino #${inquilino.id_inquilino}`} — CI ${inquilino.ci || "sin CI"} — Tel. ${inquilino.telefono || "sin teléfono"} — ${inquilino.correo || "sin correo"} — ${inquilino.estado || "sin estado"} — ID #${inquilino.id_inquilino}`;
+const inquilinoSelectedLabel = inquilinoLabel;
+const inquilinoSearchText = (inquilino: any) => [inquilino.id_inquilino, inquilino.nombre, inquilino.ci, inquilino.telefono, inquilino.correo, inquilino.estado].filter(Boolean).join(" ");
 
 export default function AlquileresPage() {
   const { idCuarto } = useParams();
