@@ -28,7 +28,6 @@ class ServicioMensual(Base):
     casa = relationship("Casa", back_populates="servicios_mensuales")
     cuarto = relationship("Cuarto", back_populates="servicios_mensuales")
     detalles_cobro = relationship("DetalleCobroMensual", back_populates="servicio_mensual")
-    detalle_cobro = detalles_cobro  # alias temporal de compatibilidad
     egreso = relationship("EgresoCasa", back_populates="servicio_mensual", uselist=False)
     distribuciones = relationship("DistribucionServicioMensual", back_populates="servicio_mensual")
 

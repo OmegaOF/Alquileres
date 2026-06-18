@@ -46,6 +46,7 @@ class DetalleCobroMensual(Base):
     servicio_mensual = relationship("ServicioMensual", back_populates="detalles_cobro")
     distribucion_servicio = relationship("DistribucionServicioMensual")
 
+    # Alias histórico de solo lectura; el nombre canónico es id_detalle_cobro.
     @property
     def id_detalle(self):
         return self.id_detalle_cobro
