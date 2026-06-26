@@ -16,6 +16,7 @@ import PagosPage from "../pages/PagosPage";
 import EgresosPage from "../pages/EgresosPage";
 import ReportesPage from "../pages/ReportesPage";
 import TrabajoMensualPage from "../pages/TrabajoMensualPage";
+import RecordatoriosPage from "../pages/RecordatoriosPage";
 
 const wrap = (el: JSX.Element) => <ProtectedRoute><Layout>{el}</Layout></ProtectedRoute>;
 
@@ -40,6 +41,7 @@ export default function AppRoutes() {
       <Route path="/periodos/:idPeriodo/trabajo-mensual" element={wrap(<TrabajoMensualPage />)} />
       <Route path="/periodos/:idPeriodo/servicios-mensuales" element={wrap(<ServiciosMensualesPage />)} />
       <Route path="/periodos/:idPeriodo/cobros" element={wrap(<CobrosPage />)} />
+      <Route path="/periodos/:idPeriodo/recordatorios" element={wrap(<RecordatoriosPage />)} />
       <Route path="/periodos/:idPeriodo/reportes" element={wrap(<ReportesPage />)} />
       <Route path="/servicios" element={wrap(<ServiciosPage />)} />
       <Route path="/servicios-mensuales" element={wrap(<ServiciosMensualesPage />)} />
