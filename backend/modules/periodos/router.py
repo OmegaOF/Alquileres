@@ -10,6 +10,10 @@ router = APIRouter(prefix="/api/periodos", tags=["periodos"])
 def list_items(db: Session = Depends(get_db), _=Depends(get_current_user)): return service.list_items(db)
 @router.post("", response_model=schemas.PeriodoMensualResponse)
 def create_item(payload: schemas.PeriodoMensualCreate, db: Session = Depends(get_db), _=Depends(get_current_user)): return service.create_item(db,payload)
+@router.get("/actual", response_model=schemas.PeriodoMensualResponse)
+def periodo_actual(db: Session = Depends(get_db), _=Depends(get_current_user)):
+ return service.obtener_o_crear_actual(db)
+
 @router.get("/{item_id}", response_model=schemas.PeriodoMensualResponse)
 def get_item(item_id:int, db: Session = Depends(get_db), _=Depends(get_current_user)):
  item=service.get_item(db,item_id)

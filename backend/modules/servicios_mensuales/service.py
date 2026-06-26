@@ -194,3 +194,46 @@ def guardar_distribuciones(db:Session, item_id:int, payload, registrado_por:int)
  for c in old_cobros:
   if c: _recalc(db,c)
  db.commit(); return obtener_distribuciones(db,item_id)
+
+ESTADOS_RECORDATORIO = {"no_preparado","preparado","enviado_manual","pendiente_envio","respondio","dijo_pago","pendiente_confirmar_pago","confirmado","sin_respuesta","error_envio"}
+
+def actualizar_recordatorio(db: Session, item: ServicioMensual, estado: str, observacion: str | None = None):
+ if estado not in ESTADOS_RECORDATORIO: raise HTTPException(400,"Estado de recordatorio inválido")
+ _periodo_abierto(db,item.id_periodo)
+ item.estado_recordatorio=estado
+ item.fecha_ultimo_contacto=datetime.utcnow()
+ if observacion is not None: item.observacion_recordatorio=observacion
+ db.commit(); db.refresh(item); return item
+
+from modules.servicios_mensuales.models import ServicioActivoInmueble
+
+def list_servicios_activos(db:Session, id_casa:int|None=None, id_cuarto:int|None=None):
+ q=db.query(ServicioActivoInmueble)
+ if id_casa is not None: q=q.filter(ServicioActivoInmueble.id_casa==id_casa)
+ if id_cuarto is not None: q=q.filter(ServicioActivoInmueble.id_cuarto==id_cuarto)
+ return q.all()
+
+def create_servicio_activo(db:Session,payload):
+ d=payload.model_dump(exclude_unset=True)
+ if not db.get(Servicio,d["id_servicio"]): raise HTTPException(400,"Servicio no existe")
+ casa=db.get(Casa,d["id_casa"])
+ if not casa: raise HTTPException(400,"Casa no existe")
+ if d.get("alcance")=="cuarto" and not d.get("id_cuarto"): raise HTTPException(400,"El alcance cuarto requiere id_cuarto")
+ if d.get("id_cuarto"):
+  cuarto=db.get(Cuarto,d["id_cuarto"])
+  if not cuarto or cuarto.id_casa!=d["id_casa"]: raise HTTPException(400,"Cuarto inválido para la casa")
+ item=ServicioActivoInmueble(**d); db.add(item); db.commit(); db.refresh(item); return item
+
+def update_servicio_activo(db:Session,item,payload):
+ for k,v in payload.model_dump(exclude_unset=True).items(): setattr(item,k,v)
+ db.commit(); db.refresh(item); return item
+
+def proponer_servicios_periodo(db:Session,id_periodo:int):
+ p=require_periodo_abierto(db,id_periodo); creados=0; omitidos=0; errores=[]
+ for cfg in db.query(ServicioActivoInmueble).filter(ServicioActivoInmueble.estado=="activo").all():
+  if cfg.monto_base is None: errores.append(f"Servicio activo {cfg.id_servicio_activo} sin monto base"); continue
+  q=db.query(ServicioMensual).filter(ServicioMensual.id_periodo==id_periodo,ServicioMensual.id_servicio==cfg.id_servicio,ServicioMensual.id_casa==cfg.id_casa,ServicioMensual.estado=="activo")
+  q=q.filter(ServicioMensual.id_cuarto==cfg.id_cuarto) if cfg.id_cuarto else q.filter(ServicioMensual.id_cuarto.is_(None))
+  if q.first(): omitidos+=1; continue
+  db.add(ServicioMensual(id_periodo=id_periodo,id_servicio=cfg.id_servicio,id_casa=cfg.id_casa,id_cuarto=cfg.id_cuarto,monto=cfg.monto_base,responsable_pago=cfg.responsable_pago,pagador_factura=cfg.pagador_factura,observacion="Propuesto desde servicios activos de casa/cuarto")); creados+=1
+ db.commit(); return {"id_periodo":id_periodo,"servicios_creados":creados,"servicios_omitidos":omitidos,"errores":errores}

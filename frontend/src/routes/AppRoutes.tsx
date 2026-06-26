@@ -36,6 +36,7 @@ export default function AppRoutes() {
       <Route path="/inquilinos" element={wrap(<InquilinosPage />)} />
       <Route path="/alquileres" element={wrap(<AlquileresPage />)} />
       <Route path="/periodos" element={wrap(<PeriodosPage />)} />
+      <Route path="/periodo-actual" element={wrap(<TrabajoMensualPage />)} />
       <Route path="/periodos/:idPeriodo/trabajo-mensual" element={wrap(<TrabajoMensualPage />)} />
       <Route path="/periodos/:idPeriodo/servicios-mensuales" element={wrap(<ServiciosMensualesPage />)} />
       <Route path="/periodos/:idPeriodo/cobros" element={wrap(<CobrosPage />)} />
