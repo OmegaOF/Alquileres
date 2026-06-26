@@ -4,13 +4,14 @@ from modules.casas.models import Casa
 from modules.cuartos.models import Cuarto
 from modules.alquileres.models import Alquiler
 from modules.periodos.models import PeriodoMensual
+from modules.periodos.service import obtener_o_crear_actual
 from modules.cobros.models import CobroMensual
 from modules.egresos.models import EgresoCasa
 
 def _sum(v): return float(v or 0)
 def resumen(db:Session):
  props={"total_casas":db.query(Casa).count(),"total_cuartos":db.query(Cuarto).count(),"cuartos_libres":db.query(Cuarto).filter(Cuarto.estado=="libre").count(),"cuartos_ocupados":db.query(Cuarto).filter(Cuarto.estado=="ocupado").count(),"alquileres_activos":db.query(Alquiler).filter(Alquiler.estado=="activo").count()}
- periodo=db.query(PeriodoMensual).filter(PeriodoMensual.estado=="abierto").order_by(PeriodoMensual.anio.desc(),PeriodoMensual.mes.desc(),PeriodoMensual.id_periodo.desc()).first()
+ periodo=obtener_o_crear_actual(db)
  fin={"total_facturado":0,"total_pagado":0,"saldo_pendiente":0,"total_egresos":0,"resultado_actual":0}; cob={"pendientes":0,"parciales":0,"pagados":0,"atrasados":0}
  per=None
  if periodo:

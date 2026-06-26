@@ -10,6 +10,10 @@ router = APIRouter(prefix="/api/cobros", tags=["cobros"])
 def list_items(db: Session = Depends(get_db), _=Depends(get_current_user)): return service.list_items(db)
 @router.post("", response_model=schemas.CobroMensualResponse)
 def create_item(payload: schemas.CobroMensualCreate, db: Session = Depends(get_db), _=Depends(get_current_user)): return service.create_item(db,payload)
+@router.get("/periodo/{id_periodo}/cobranza")
+def cobranza(id_periodo:int, db: Session = Depends(get_db), _=Depends(get_current_user)):
+ return service.cobranza_periodo(db,id_periodo)
+
 @router.get("/{item_id}", response_model=schemas.CobroMensualResponse)
 def get_item(item_id:int, db: Session = Depends(get_db), _=Depends(get_current_user)):
  item=service.get_item(db,item_id)
@@ -37,3 +41,9 @@ def delete_item(item_id:int, db: Session = Depends(get_db), _=Depends(get_curren
 @router.post("/generar-periodo/{id_periodo}")
 def generar(id_periodo:int, db:Session=Depends(get_db), current_user=Depends(get_current_user)):
  return service.generar_periodo(db,id_periodo,current_user.id_usuario)
+
+@router.post("/{item_id}/recordatorio", response_model=schemas.CobroMensualResponse)
+def recordatorio(item_id:int, payload: schemas.RecordatorioUpdate, db: Session = Depends(get_db), _=Depends(get_current_user)):
+ item=service.get_item(db,item_id)
+ if not item: raise HTTPException(404,"No encontrado")
+ return service.actualizar_recordatorio(db,item,payload.estado,payload.observacion)

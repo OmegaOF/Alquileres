@@ -10,6 +10,28 @@ router = APIRouter(prefix="/api/servicios-mensuales", tags=["servicios_mensuales
 def list_items(id_periodo:int|None=Query(default=None), db: Session = Depends(get_db), _=Depends(get_current_user)): return service.list_items(db,id_periodo)
 @router.post("", response_model=schemas.ServicioMensualResponse)
 def create_item(payload: schemas.ServicioMensualCreate, db: Session = Depends(get_db), current_user=Depends(get_current_user)): return service.create_item(db,payload,current_user.id_usuario)
+@router.get("/activos/inmuebles", response_model=list[schemas.ServicioActivoResponse])
+def list_activos(id_casa:int|None=Query(default=None), id_cuarto:int|None=Query(default=None), db: Session = Depends(get_db), _=Depends(get_current_user)):
+ return service.list_servicios_activos(db,id_casa,id_cuarto)
+@router.post("/activos/inmuebles", response_model=schemas.ServicioActivoResponse)
+def create_activo(payload: schemas.ServicioActivoCreate, db: Session = Depends(get_db), _=Depends(get_current_user)):
+ return service.create_servicio_activo(db,payload)
+@router.put("/activos/inmuebles/{item_id}", response_model=schemas.ServicioActivoResponse)
+def update_activo(item_id:int, payload: schemas.ServicioActivoUpdate, db: Session = Depends(get_db), _=Depends(get_current_user)):
+ item=db.get(service.ServicioActivoInmueble,item_id)
+ if not item: raise HTTPException(404,"No encontrado")
+ return service.update_servicio_activo(db,item,payload)
+@router.post("/proponer-periodo/{id_periodo}")
+def proponer_periodo(id_periodo:int, db: Session = Depends(get_db), _=Depends(get_current_user)):
+ return service.proponer_servicios_periodo(db,id_periodo)
+
+
+@router.post("/{item_id}/recordatorio", response_model=schemas.ServicioMensualResponse)
+def recordatorio(item_id:int, payload: schemas.RecordatorioUpdate, db: Session = Depends(get_db), _=Depends(get_current_user)):
+ item=service.get_item(db,item_id)
+ if not item: raise HTTPException(404,"No encontrado")
+ return service.actualizar_recordatorio(db,item,payload.estado,payload.observacion)
+
 @router.get("/{item_id}/distribuciones")
 def get_distribuciones(item_id:int, db: Session = Depends(get_db), _=Depends(get_current_user)):
  return service.obtener_distribuciones(db,item_id)
@@ -37,3 +59,4 @@ def delete_item(item_id:int, db: Session = Depends(get_db), current_user=Depends
  if not item: raise HTTPException(404,"No encontrado")
  service.delete_item(db,item,current_user.id_usuario)
  return {"ok":True}
+
