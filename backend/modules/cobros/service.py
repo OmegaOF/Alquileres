@@ -48,7 +48,7 @@ def delete_item(db: Session, item): require_periodo_abierto(db, item.id_periodo)
 def generar_periodo(db: Session, id_periodo: int, registrado_por: int):
     periodo = require_periodo_abierto(db, id_periodo)
     r={"id_periodo":id_periodo,"cobros_creados":0,"cobros_guardados":0,"cobros_omitidos":0,"egresos_creados":0,"errores":[],"rollback":False,"mensaje":""}
-    activos = db.query(Alquiler).filter(Alquiler.fecha_inicio<=periodo.fecha_fin, ((Alquiler.fecha_fin.is_(None)) | (Alquiler.fecha_fin>=periodo.fecha_inicio)), Alquiler.estado!="anulado").all()
+    activos = db.query(Alquiler).filter(Alquiler.fecha_inicio<=periodo.fecha_fin, ((Alquiler.fecha_fin.is_(None)) | (Alquiler.fecha_fin>=periodo.fecha_inicio)), Alquiler.estado=="activo", Alquiler.id_inquilino.isnot(None), Alquiler.id_cuarto.isnot(None)).all()
     try:
       for a in activos:
         modalidad=a.modalidad_alquiler or "mensual"
@@ -56,7 +56,10 @@ def generar_periodo(db: Session, id_periodo: int, registrado_por: int):
           r["cobros_omitidos"]+=1; continue
         if db.query(CobroMensual).filter(CobroMensual.id_alquiler==a.id_alquiler).first() if modalidad=="diario" else db.query(CobroMensual).filter(CobroMensual.id_periodo==id_periodo,CobroMensual.id_alquiler==a.id_alquiler).first(): r["cobros_omitidos"]+=1; continue
         cuarto=db.get(Cuarto,a.id_cuarto); inq=db.get(Inquilino,a.id_inquilino)
-        if not cuarto or not inq: r["errores"].append(f"alquiler {a.id_alquiler} sin cuarto/inquilino"); continue
+        if not cuarto or not inq:
+          r["errores"].append(f"alquiler {a.id_alquiler} sin cuarto/inquilino"); continue
+        if cuarto.estado != "ocupado":
+          r["cobros_omitidos"]+=1; continue
         deuda=sum(Decimal(c.saldo_pendiente) for c in db.query(CobroMensual).filter(CobroMensual.id_alquiler==a.id_alquiler,CobroMensual.saldo_pendiente>0,CobroMensual.id_periodo!=id_periodo).all())
         dia=min(max(a.dia_pago,1),28); limite=date(periodo.anio,periodo.mes,dia)
         monto_alquiler=Decimal(a.total_alquiler_diario or a.monto_alquiler) if modalidad=="diario" else Decimal(a.monto_mensual or a.monto_alquiler)
@@ -110,7 +113,7 @@ def cobranza_periodo(db: Session, id_periodo: int):
     periodo = db.get(PeriodoMensual, id_periodo)
     if not periodo: raise HTTPException(404,"No encontrado")
     rows=[]; hoy=date.today()
-    for c in db.query(CobroMensual).filter(CobroMensual.id_periodo==id_periodo).all():
+    for c in db.query(CobroMensual).join(CobroMensual.alquiler).join(CobroMensual.cuarto).join(CobroMensual.inquilino).filter(CobroMensual.id_periodo==id_periodo, CobroMensual.estado!="anulado", Alquiler.estado=="activo", Alquiler.id_inquilino.isnot(None), Alquiler.id_cuarto.isnot(None), Cuarto.estado=="ocupado").all():
         modalidad = c.alquiler.modalidad_alquiler if c.alquiler else "mensual"
         conceptos=[]
         if Decimal(c.deuda_anterior or 0)>0: conceptos.append("deuda anterior")
@@ -122,5 +125,5 @@ def cobranza_periodo(db: Session, id_periodo: int):
         elif c.fecha_limite_pago and c.fecha_limite_pago<hoy: prioridad=1
         elif dias<=3: prioridad=2
         else: prioridad=3
-        rows.append({"tipo":"cobro","prioridad":prioridad,"id_cobro":c.id_cobro,"id_periodo":c.id_periodo,"inquilino":getattr(c.inquilino,'nombre_completo',None),"casa":getattr(c.casa,'nombre_casa',None),"cuarto":getattr(c.cuarto,'numero_cuarto',None),"modalidad":modalidad,"concepto_principal":" + ".join(conceptos),"total_a_pagar":float(c.total_a_pagar or 0),"total_pagado":float(c.total_pagado or 0),"saldo_pendiente":float(saldo),"fecha_limite":str(c.fecha_limite_pago) if c.fecha_limite_pago else None,"estado_financiero":c.estado,"estado_recordatorio":c.estado_recordatorio or "no_preparado","color":"verde" if saldo<=0 else ("rojo" if prioridad==1 else ("naranja" if prioridad in (2,4) else "azul" if c.estado_recordatorio not in (None,"no_preparado") else "naranja"))})
+        rows.append({"tipo":"cobro","prioridad":prioridad,"id_cobro":c.id_cobro,"id_periodo":c.id_periodo,"inquilino":getattr(c.inquilino,'nombre_completo',None),"casa":getattr(c.casa,'nombre_casa',None),"cuarto":getattr(c.cuarto,'numero_cuarto',None),"modalidad":modalidad,"estado_alquiler":c.alquiler.estado if c.alquiler else None,"monto_alquiler":float(c.monto_alquiler or 0),"concepto_principal":" + ".join(conceptos),"total_a_pagar":float(c.total_a_pagar or 0),"total_pagado":float(c.total_pagado or 0),"saldo_pendiente":float(saldo),"fecha_limite":str(c.fecha_limite_pago) if c.fecha_limite_pago else None,"estado_financiero":c.estado,"estado_recordatorio":c.estado_recordatorio or "no_preparado","color":"verde" if saldo<=0 else ("rojo" if prioridad==1 else ("naranja" if prioridad in (2,4) else "azul" if c.estado_recordatorio not in (None,"no_preparado") else "naranja"))})
     return {"periodo":periodo,"items":sorted(rows,key=lambda x:(x["prioridad"],x["fecha_limite"] or ""))}
