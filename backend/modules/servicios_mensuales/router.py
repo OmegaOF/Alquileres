@@ -22,8 +22,8 @@ def update_activo(item_id:int, payload: schemas.ServicioActivoUpdate, db: Sessio
  if not item: raise HTTPException(404,"No encontrado")
  return service.update_servicio_activo(db,item,payload)
 @router.post("/proponer-periodo/{id_periodo}")
-def proponer_periodo(id_periodo:int, db: Session = Depends(get_db), _=Depends(get_current_user)):
- return service.proponer_servicios_periodo(db,id_periodo)
+def proponer_periodo(id_periodo:int, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+ return service.proponer_servicios_periodo(db,id_periodo,current_user.id_usuario)
 
 
 @router.post("/{item_id}/recordatorio", response_model=schemas.ServicioMensualResponse)

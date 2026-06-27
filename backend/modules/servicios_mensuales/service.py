@@ -43,6 +43,27 @@ def _alquiler_activo(db,id_periodo,id_cuarto):
   ((Alquiler.modalidad_alquiler.is_(None)) | (Alquiler.modalidad_alquiler=="mensual")),
  ).order_by(Alquiler.fecha_inicio.desc(),Alquiler.id_alquiler.desc()).first()
 
+def _alquiler_cobrable(db,id_periodo,id_cuarto):
+ a=_alquiler_activo(db,id_periodo,id_cuarto)
+ if not a or not a.id_inquilino: return None
+ c=db.get(Cuarto,id_cuarto)
+ if not c or c.estado!="ocupado": return None
+ return a
+
+def _alquileres_cobrables_casa(db,id_periodo,id_casa):
+ p=db.get(PeriodoMensual,id_periodo)
+ if not p: raise HTTPException(400,"Periodo no existe")
+ return db.query(Alquiler).join(Cuarto, Alquiler.id_cuarto==Cuarto.id_cuarto).filter(
+  Cuarto.id_casa==id_casa,
+  Cuarto.estado=="ocupado",
+  Alquiler.id_inquilino.isnot(None),
+  Alquiler.id_cuarto.isnot(None),
+  Alquiler.fecha_inicio<=p.fecha_fin,
+  ((Alquiler.fecha_fin.is_(None)) | (Alquiler.fecha_fin>=p.fecha_inicio)),
+  Alquiler.estado=="activo",
+  ((Alquiler.modalidad_alquiler.is_(None)) | (Alquiler.modalidad_alquiler=="mensual")),
+ ).order_by(Alquiler.id_cuarto, Alquiler.fecha_inicio, Alquiler.id_alquiler).all()
+
 def _validar(db,d,item=None):
  _periodo_abierto(db,d["id_periodo"]); servicio=_servicio_activo(db,d["id_servicio"])
  if not db.get(Casa,d["id_casa"]): raise HTTPException(400,"Casa no existe")
@@ -53,8 +74,10 @@ def _validar(db,d,item=None):
   if c.id_casa!=d["id_casa"]: raise HTTPException(400,"Cuarto no pertenece a casa")
  d.setdefault("pagador_factura", "propietario" if d.get("responsable_pago")=="propietario" else "inquilino_directo")
  if d["responsable_pago"]=="inquilino":
-  if not id_cuarto: raise HTTPException(400,MSG_DIST)
-  if not _alquiler_activo(db,d["id_periodo"],id_cuarto): raise HTTPException(400,MSG_VACIO)
+  if id_cuarto:
+   if not _alquiler_cobrable(db,d["id_periodo"],id_cuarto): raise HTTPException(400,MSG_VACIO)
+  elif not _alquileres_cobrables_casa(db,d["id_periodo"],d["id_casa"]):
+   raise HTTPException(400,"La casa no tiene cuartos ocupados con alquiler activo e inquilino para distribuir el servicio")
  q=db.query(ServicioMensual).filter(ServicioMensual.id_periodo==d["id_periodo"],ServicioMensual.id_servicio==d["id_servicio"],ServicioMensual.id_casa==d["id_casa"],ServicioMensual.responsable_pago==d["responsable_pago"],ServicioMensual.estado=="activo")
  q=q.filter(ServicioMensual.id_cuarto==id_cuarto) if id_cuarto else q.filter(ServicioMensual.id_cuarto.is_(None))
  if item: q=q.filter(ServicioMensual.id_servicio_mensual!=item.id_servicio_mensual)
@@ -129,12 +152,22 @@ def dias_ocupados_en_periodo(alquiler, periodo):
 
 def calcular_distribuciones_servicio(db:Session, s:ServicioMensual):
  p=db.get(PeriodoMensual,s.id_periodo)
- if not p or not s.id_cuarto or s.responsable_pago!="inquilino" or s.estado!="activo": return []
+ if not p or s.responsable_pago!="inquilino" or s.estado!="activo": return []
  dias_periodo=(p.fecha_fin-p.fecha_inicio).days+1
  monto=Decimal(s.monto).quantize(Decimal('0.01'))
- alquileres=db.query(Alquiler).filter(Alquiler.id_cuarto==s.id_cuarto, Alquiler.fecha_inicio<=p.fecha_fin, ((Alquiler.fecha_fin.is_(None)) | (Alquiler.fecha_fin>=p.fecha_inicio)), Alquiler.estado!="anulado", ((Alquiler.modalidad_alquiler.is_(None)) | (Alquiler.modalidad_alquiler=="mensual"))).order_by(Alquiler.fecha_inicio,Alquiler.id_alquiler).all()
+ if not s.id_cuarto:
+  alquileres=_alquileres_cobrables_casa(db,s.id_periodo,s.id_casa)
+  if not alquileres: return []
+  base=(monto/Decimal(len(alquileres))).quantize(Decimal('0.01'))
+  res=[]; usado=Decimal('0.00')
+  for idx,a in enumerate(alquileres):
+   val=monto-usado if idx==len(alquileres)-1 else base
+   usado+=val
+   res.append({"alquiler":a,"dias":dias_ocupados_en_periodo(a,p),"monto":val,"tipo":"casa_completa"})
+  return res
+ alquileres=db.query(Alquiler).filter(Alquiler.id_cuarto==s.id_cuarto, Alquiler.fecha_inicio<=p.fecha_fin, ((Alquiler.fecha_fin.is_(None)) | (Alquiler.fecha_fin>=p.fecha_inicio)), Alquiler.estado!="anulado", Alquiler.id_inquilino.isnot(None), ((Alquiler.modalidad_alquiler.is_(None)) | (Alquiler.modalidad_alquiler=="mensual"))).order_by(Alquiler.fecha_inicio,Alquiler.id_alquiler).all()
  candidatos=[(a,dias_ocupados_en_periodo(a,p)) for a in alquileres]
- candidatos=[x for x in candidatos if x[1]>0]
+ candidatos=[x for x in candidatos if x[1]>0 and _alquiler_cobrable(db,s.id_periodo,x[0].id_cuarto)]
  if not candidatos: return []
  full=[x for x in candidatos if x[1]>=15]
  if len(candidatos)>1 and full:
@@ -146,7 +179,6 @@ def calcular_distribuciones_servicio(db:Session, s:ServicioMensual):
  if len(candidatos)==1:
   a,dias=candidatos[0]
   if dias>=15: return [{"alquiler":a,"dias":dias,"monto":monto,"tipo":"completo"},{"alquiler":None,"dias":dias_periodo-dias,"monto":Decimal('0.00'),"tipo":"propietario"}]
- # varios menores a 15, o un único menor
  res=[]; usado=Decimal('0.00')
  for a,dias in candidatos:
   val=(monto/Decimal(dias_periodo)*Decimal(dias)).quantize(Decimal('0.01'))
@@ -185,7 +217,7 @@ def guardar_distribuciones(db:Session, item_id:int, payload, registrado_por:int)
   aid=x.id_alquiler
   if aid is not None:
    a=db.get(Alquiler,aid)
-   if aid not in permitidos or not a or a.id_cuarto!=s.id_cuarto or a.estado=="anulado" or (a.modalidad_alquiler and a.modalidad_alquiler!="mensual") or a.fecha_inicio>p.fecha_fin or (a.fecha_fin and a.fecha_fin<p.fecha_inicio): raise HTTPException(400,"Alquiler inválido para esta distribución")
+   if aid not in permitidos or not a or (s.id_cuarto and a.id_cuarto!=s.id_cuarto) or (not s.id_cuarto and (not a.cuarto or a.cuarto.id_casa!=s.id_casa)) or a.estado=="anulado" or (a.modalidad_alquiler and a.modalidad_alquiler!="mensual") or a.fecha_inicio>p.fecha_fin or (a.fecha_fin and a.fecha_fin<p.fecha_inicio): raise HTTPException(400,"Alquiler inválido para esta distribución")
    dias=dias_ocupados_en_periodo(a,p); parte=Decimal('0.00'); tipo="manual"
   else:
    dias=0; parte=Decimal(str(x.monto_asignado)).quantize(Decimal('0.01')); tipo="propietario_manual"
@@ -228,12 +260,27 @@ def update_servicio_activo(db:Session,item,payload):
  for k,v in payload.model_dump(exclude_unset=True).items(): setattr(item,k,v)
  db.commit(); db.refresh(item); return item
 
-def proponer_servicios_periodo(db:Session,id_periodo:int):
- p=require_periodo_abierto(db,id_periodo); creados=0; omitidos=0; errores=[]
+def _servicio_mensual_existente(db,id_periodo,cfg,responsable_pago):
+ q=db.query(ServicioMensual).filter(ServicioMensual.id_periodo==id_periodo,ServicioMensual.id_servicio==cfg.id_servicio,ServicioMensual.id_casa==cfg.id_casa,ServicioMensual.responsable_pago==responsable_pago,ServicioMensual.estado=="activo")
+ q=q.filter(ServicioMensual.id_cuarto==cfg.id_cuarto) if cfg.id_cuarto else q.filter(ServicioMensual.id_cuarto.is_(None))
+ return q.first()
+
+def proponer_servicios_periodo(db:Session,id_periodo:int,registrado_por:int=1):
+ require_periodo_abierto(db,id_periodo); creados=0; omitidos=0; errores=[]
  for cfg in db.query(ServicioActivoInmueble).filter(ServicioActivoInmueble.estado=="activo").all():
   if cfg.monto_base is None: errores.append(f"Servicio activo {cfg.id_servicio_activo} sin monto base"); continue
-  q=db.query(ServicioMensual).filter(ServicioMensual.id_periodo==id_periodo,ServicioMensual.id_servicio==cfg.id_servicio,ServicioMensual.id_casa==cfg.id_casa,ServicioMensual.estado=="activo")
-  q=q.filter(ServicioMensual.id_cuarto==cfg.id_cuarto) if cfg.id_cuarto else q.filter(ServicioMensual.id_cuarto.is_(None))
-  if q.first(): omitidos+=1; continue
-  db.add(ServicioMensual(id_periodo=id_periodo,id_servicio=cfg.id_servicio,id_casa=cfg.id_casa,id_cuarto=cfg.id_cuarto,monto=cfg.monto_base,responsable_pago=cfg.responsable_pago,pagador_factura=cfg.pagador_factura,observacion="Propuesto desde servicios activos de casa/cuarto")); creados+=1
+  responsable=cfg.responsable_pago
+  if cfg.responsable_pago=="inquilino":
+   if cfg.id_cuarto:
+    if not _alquiler_cobrable(db,id_periodo,cfg.id_cuarto):
+     if cfg.pagador_factura=="propietario": responsable="propietario"
+     else:
+      omitidos+=1; continue
+   elif not _alquileres_cobrables_casa(db,id_periodo,cfg.id_casa):
+    if cfg.pagador_factura=="propietario": responsable="propietario"
+    else:
+     omitidos+=1; continue
+  if _servicio_mensual_existente(db,id_periodo,cfg,responsable): omitidos+=1; continue
+  s=ServicioMensual(id_periodo=id_periodo,id_servicio=cfg.id_servicio,id_casa=cfg.id_casa,id_cuarto=cfg.id_cuarto,monto=cfg.monto_base,responsable_pago=responsable,pagador_factura=cfg.pagador_factura,observacion="Generado automáticamente desde servicios activos de casa/cuarto")
+  db.add(s); db.flush(); recrear_distribuciones_servicio(db,s); _sync(db,s,registrado_por); creados+=1
  db.commit(); return {"id_periodo":id_periodo,"servicios_creados":creados,"servicios_omitidos":omitidos,"errores":errores}
