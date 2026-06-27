@@ -31,8 +31,9 @@ def _normalizar(d, item=None):
  return d
 
 def _val(db,d,item=None):
- if "id_inquilino" in d and not db.get(Inquilino,d["id_inquilino"]): raise HTTPException(400,"Inquilino no existe")
- if "id_cuarto" in d and not db.get(Cuarto,d["id_cuarto"]): raise HTTPException(400,"Cuarto no existe")
+ if not item and not d.get("id_inquilino"): raise HTTPException(400,"El inquilino es obligatorio")
+ if "id_inquilino" in d and (not d["id_inquilino"] or not db.get(Inquilino,d["id_inquilino"])): raise HTTPException(400,"Inquilino no existe")
+ if "id_cuarto" in d and (not d["id_cuarto"] or not db.get(Cuarto,d["id_cuarto"])): raise HTTPException(400,"Cuarto no existe")
  cuarto_id=d.get("id_cuarto", item.id_cuarto if item else None); estado=d.get("estado", item.estado if item else "activo")
  if cuarto_id and estado=="activo":
   q=db.query(Alquiler).filter(Alquiler.id_cuarto==cuarto_id,Alquiler.estado=="activo")
