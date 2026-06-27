@@ -44,10 +44,10 @@ export default function AppRoutes() {
       <Route path="/periodos/:idPeriodo/recordatorios" element={wrap(<RecordatoriosPage />)} />
       <Route path="/periodos/:idPeriodo/reportes" element={wrap(<ReportesPage />)} />
       <Route path="/servicios" element={wrap(<ServiciosPage />)} />
-      <Route path="/servicios-mensuales" element={wrap(<ServiciosMensualesPage />)} />
-      <Route path="/cobros" element={wrap(<CobrosPage />)} />
+      <Route path="/servicios-mensuales" element={<Navigate to="/periodos" replace />} />
+      <Route path="/cobros" element={<Navigate to="/periodos" replace />} />
       <Route path="/cobros/:idCobro/pagos/nuevo" element={wrap(<PagosPage />)} />
-      <Route path="/pagos" element={wrap(<PagosPage />)} />
+      <Route path="/pagos" element={<Navigate to="/periodos" replace />} />
       <Route path="/egresos" element={wrap(<EgresosPage />)} />
       <Route path="/reportes" element={wrap(<ReportesPage />)} />
     </Routes>
