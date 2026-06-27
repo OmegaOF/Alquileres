@@ -4,6 +4,12 @@ import { Link } from "react-router-dom";
 const statusClasses: Record<string, string> = {
   activo: "success", activa: "success", inactivo: "neutral", inactiva: "neutral", libre: "success", ocupado: "danger", reservado: "info", mantenimiento: "warning", pendiente: "warning", parcial: "info", pagado: "success", atrasado: "danger", abierto: "success", cerrado: "neutral", finalizado: "neutral", cancelado: "danger", anulado: "danger", valido: "success",
 };
+const visibleStateLabels: Record<string, string> = {
+  no_preparado: "Sin preparar",
+  preparado: "Mensaje preparado",
+  pendiente_confirmar_pago: "Pago reportado",
+  sin_respuesta: "Sin respuesta",
+};
 
 export type BreadcrumbItem = { label: string; to?: string };
 export type ActionItem = { label: string; to?: string; onClick?: () => void; danger?: boolean; disabled?: boolean };
@@ -14,7 +20,7 @@ export function formatMoney(value: unknown) { const n = Number(value ?? 0); if (
 export function errorMessage(e: any) { return e?.response?.data?.detail ? JSON.stringify(e.response.data.detail) : "Ocurrió un error. Revisa los datos e inténtalo nuevamente."; }
 
 export function StatusBadge({ value }: { value: unknown }) {
-  const text = String(value ?? ""); const key = text.toLowerCase(); const tone = statusClasses[key] ?? "primary";
+  const raw = String(value ?? ""); const key = raw.toLowerCase(); const text = visibleStateLabels[key] || raw; const tone = statusClasses[key] ?? "primary";
   return <span className={`badge badge-${tone}`}>{text || "Sin estado"}</span>;
 }
 
