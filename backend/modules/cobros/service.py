@@ -109,11 +109,26 @@ def actualizar_recordatorio(db: Session, item: CobroMensual, estado: str, observ
     db.commit(); db.refresh(item); return item
 
 def cobranza_periodo(db: Session, id_periodo: int):
-    from modules.pagos.models import Pago
     periodo = db.get(PeriodoMensual, id_periodo)
     if not periodo: raise HTTPException(404,"No encontrado")
     rows=[]; hoy=date.today()
-    for c in db.query(CobroMensual).join(CobroMensual.alquiler).join(CobroMensual.cuarto).join(CobroMensual.inquilino).filter(CobroMensual.id_periodo==id_periodo, CobroMensual.estado!="anulado", Alquiler.estado=="activo", Alquiler.id_inquilino.isnot(None), Alquiler.id_cuarto.isnot(None), Cuarto.estado=="ocupado").all():
+    cobros = (
+        db.query(CobroMensual)
+        .join(CobroMensual.alquiler)
+        .join(CobroMensual.inquilino)
+        .join(CobroMensual.cuarto)
+        .join(CobroMensual.casa)
+        .filter(
+            CobroMensual.id_periodo==id_periodo,
+            CobroMensual.estado!="anulado",
+            Alquiler.estado=="activo",
+            Alquiler.id_inquilino.isnot(None),
+            Alquiler.id_cuarto.isnot(None),
+            Cuarto.estado=="ocupado",
+        )
+        .all()
+    )
+    for c in cobros:
         modalidad = c.alquiler.modalidad_alquiler if c.alquiler else "mensual"
         conceptos=[]
         if Decimal(c.deuda_anterior or 0)>0: conceptos.append("deuda anterior")
@@ -125,5 +140,37 @@ def cobranza_periodo(db: Session, id_periodo: int):
         elif c.fecha_limite_pago and c.fecha_limite_pago<hoy: prioridad=1
         elif dias<=3: prioridad=2
         else: prioridad=3
-        rows.append({"tipo":"cobro","prioridad":prioridad,"id_cobro":c.id_cobro,"id_periodo":c.id_periodo,"inquilino":getattr(c.inquilino,'nombre_completo',None),"casa":getattr(c.casa,'nombre_casa',None),"cuarto":getattr(c.cuarto,'numero_cuarto',None),"modalidad":modalidad,"estado_alquiler":c.alquiler.estado if c.alquiler else None,"monto_alquiler":float(c.monto_alquiler or 0),"concepto_principal":" + ".join(conceptos),"total_a_pagar":float(c.total_a_pagar or 0),"total_pagado":float(c.total_pagado or 0),"saldo_pendiente":float(saldo),"fecha_limite":str(c.fecha_limite_pago) if c.fecha_limite_pago else None,"estado_financiero":c.estado,"estado_recordatorio":c.estado_recordatorio or "no_preparado","color":"verde" if saldo<=0 else ("rojo" if prioridad==1 else ("naranja" if prioridad in (2,4) else "azul" if c.estado_recordatorio not in (None,"no_preparado") else "naranja"))})
+        nombre_inquilino = getattr(c.inquilino, "nombre_completo", None) or getattr(c.inquilino, "nombre", None)
+        nombre_casa = getattr(c.casa, "nombre_casa", None)
+        numero_cuarto = getattr(c.cuarto, "numero_cuarto", None)
+        rows.append({
+            "tipo":"cobro",
+            "prioridad":prioridad,
+            "id_cobro":c.id_cobro,
+            "id_alquiler":c.id_alquiler,
+            "id_inquilino":c.id_inquilino,
+            "nombre_inquilino":nombre_inquilino,
+            "id_periodo":c.id_periodo,
+            "id_casa":c.id_casa,
+            "nombre_casa":nombre_casa,
+            "id_cuarto":c.id_cuarto,
+            "numero_cuarto":numero_cuarto,
+            "nombre_cuarto":numero_cuarto,
+            "inquilino":nombre_inquilino,
+            "casa":nombre_casa,
+            "cuarto":numero_cuarto,
+            "modalidad":modalidad,
+            "modalidad_alquiler":modalidad,
+            "estado_alquiler":c.alquiler.estado if c.alquiler else None,
+            "estado_cuarto":c.cuarto.estado if c.cuarto else None,
+            "monto_alquiler":float(c.monto_alquiler or 0),
+            "concepto_principal":" + ".join(conceptos),
+            "total_a_pagar":float(c.total_a_pagar or 0),
+            "total_pagado":float(c.total_pagado or 0),
+            "saldo_pendiente":float(saldo),
+            "fecha_limite":str(c.fecha_limite_pago) if c.fecha_limite_pago else None,
+            "estado_financiero":c.estado,
+            "estado_recordatorio":c.estado_recordatorio or "no_preparado",
+            "color":"verde" if saldo<=0 else ("rojo" if prioridad==1 else ("naranja" if prioridad in (2,4) else "azul" if c.estado_recordatorio not in (None,"no_preparado") else "naranja"))
+        })
     return {"periodo":periodo,"items":sorted(rows,key=lambda x:(x["prioridad"],x["fecha_limite"] or ""))}
