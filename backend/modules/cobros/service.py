@@ -10,7 +10,7 @@ from modules.inquilinos.models import Inquilino
 from modules.periodos.models import PeriodoMensual
 from modules.periodos.validators import require_periodo_abierto
 from modules.servicios_mensuales.models import ServicioMensual
-from modules.servicios_mensuales.service import recrear_distribuciones_servicio
+from modules.servicios_mensuales.service import recrear_distribuciones_servicio, proponer_servicios_periodo
 
 
 def list_items(db: Session): return db.query(CobroMensual).all()
@@ -47,7 +47,8 @@ def delete_item(db: Session, item): require_periodo_abierto(db, item.id_periodo)
 
 def generar_periodo(db: Session, id_periodo: int, registrado_por: int):
     periodo = require_periodo_abierto(db, id_periodo)
-    r={"id_periodo":id_periodo,"cobros_creados":0,"cobros_guardados":0,"cobros_omitidos":0,"egresos_creados":0,"errores":[],"rollback":False,"mensaje":""}
+    propuesta = proponer_servicios_periodo(db, id_periodo, registrado_por)
+    r={"id_periodo":id_periodo,"servicios_creados":propuesta.get("servicios_creados",0),"servicios_omitidos":propuesta.get("servicios_omitidos",0),"cobros_creados":0,"cobros_guardados":0,"cobros_omitidos":0,"egresos_creados":0,"errores":propuesta.get("errores",[]),"rollback":False,"mensaje":""}
     activos = db.query(Alquiler).filter(Alquiler.fecha_inicio<=periodo.fecha_fin, ((Alquiler.fecha_fin.is_(None)) | (Alquiler.fecha_fin>=periodo.fecha_inicio)), Alquiler.estado=="activo", Alquiler.id_inquilino.isnot(None), Alquiler.id_cuarto.isnot(None)).all()
     try:
       for a in activos:
@@ -66,7 +67,7 @@ def generar_periodo(db: Session, id_periodo: int, registrado_por: int):
         detalles=[DetalleCobroMensual(tipo_concepto="alquiler_diario" if modalidad=="diario" else "alquiler",concepto="Alquiler diario" if modalidad=="diario" else "Alquiler mensual",monto=monto_alquiler,descripcion="Servicios básicos incluidos" if modalidad=="diario" else "Renta mensual completa")]
         monto_serv=Decimal('0.00')
         if modalidad=="mensual":
-          sm=db.query(ServicioMensual).filter(ServicioMensual.id_periodo==id_periodo,ServicioMensual.id_cuarto==a.id_cuarto,ServicioMensual.responsable_pago=="inquilino",ServicioMensual.estado=="activo").all()
+          sm=db.query(ServicioMensual).filter(ServicioMensual.id_periodo==id_periodo,ServicioMensual.responsable_pago=="inquilino",ServicioMensual.estado=="activo", ((ServicioMensual.id_cuarto==a.id_cuarto) | ((ServicioMensual.id_cuarto.is_(None)) & (ServicioMensual.id_casa==cuarto.id_casa)))).all()
           for s in sm:
             recrear_distribuciones_servicio(db,s); db.flush()
             if any(d.tipo_calculo=="manual_requerido" for d in s.distribuciones):

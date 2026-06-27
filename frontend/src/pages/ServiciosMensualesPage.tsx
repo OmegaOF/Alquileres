@@ -4,53 +4,723 @@ import api from "../lib/api";
 import ContextHelp from "../components/ContextHelp";
 import SearchSelect from "../components/SearchSelect";
 import PeriodoActualTabs from "../components/PeriodoActualTabs";
-import { BreadcrumbItem, Card, ContextSummary, DataTable, Drawer, EmptyState, ErrorMessage, FormActions, FormInput, FormSelect, PageHeader, RowActionsMenu, errorMessage } from "../components/ui";
+import {
+  BreadcrumbItem,
+  Card,
+  ContextSummary,
+  DataTable,
+  Drawer,
+  EmptyState,
+  ErrorMessage,
+  FormActions,
+  FormInput,
+  FormSelect,
+  PageHeader,
+  RowActionsMenu,
+  errorMessage,
+} from "../components/ui";
 
-const initialForm = { id_servicio: "", id_casa: "", alcance: "cuarto", id_cuarto: "", monto: "", responsable_pago: "inquilino", pagador_factura: "propietario", estado_pago: "pendiente", metodo_pago: "", fecha_pago: "", numero_comprobante: "", observacion: "" };
-const servicioLabel = (s:any) => `${s.nombre_servicio || `Servicio #${s.id_servicio}`} — ${s.descripcion || "sin descripción"} — ${s.estado || "sin estado"} — ID #${s.id_servicio}`;
-const servicioSearchText = (s:any) => [s.id_servicio, s.nombre_servicio, s.descripcion, s.estado].filter(Boolean).join(" ");
-const casaLabel = (c:any) => `${c.nombre_casa || `Casa #${c.id_casa}`} — ${c.direccion || "sin dirección"} — ${c.zona || "sin zona"} — ${c.ciudad || "sin ciudad"} — ${c.estado || "sin estado"} — ID #${c.id_casa}`;
-const casaSearchText = (c:any) => [c.id_casa, c.nombre_casa, c.direccion, c.zona, c.ciudad, c.estado].filter(Boolean).join(" ");
+const initialForm = {
+  id_servicio: "",
+  id_casa: "",
+  alcance: "cuarto",
+  id_cuarto: "",
+  monto: "",
+  responsable_pago: "inquilino",
+  pagador_factura: "propietario",
+  estado_pago: "pendiente",
+  metodo_pago: "",
+  fecha_pago: "",
+  numero_comprobante: "",
+  observacion: "",
+};
+const servicioLabel = (s: any) =>
+  `${s.nombre_servicio || `Servicio #${s.id_servicio}`} — ${s.descripcion || "sin descripción"} — ${s.estado || "sin estado"} — ID #${s.id_servicio}`;
+const servicioSearchText = (s: any) =>
+  [s.id_servicio, s.nombre_servicio, s.descripcion, s.estado]
+    .filter(Boolean)
+    .join(" ");
+const casaLabel = (c: any) =>
+  `${c.nombre_casa || `Casa #${c.id_casa}`} — ${c.direccion || "sin dirección"} — ${c.zona || "sin zona"} — ${c.ciudad || "sin ciudad"} — ${c.estado || "sin estado"} — ID #${c.id_casa}`;
+const casaSearchText = (c: any) =>
+  [c.id_casa, c.nombre_casa, c.direccion, c.zona, c.ciudad, c.estado]
+    .filter(Boolean)
+    .join(" ");
 export default function ServiciosMensualesPage() {
   const { idPeriodo } = useParams();
-  const [items, setItems] = useState<any[]>([]); const [error, setError] = useState(""); const [form, setForm] = useState<any>(initialForm); const [editing, setEditing] = useState<any>(null); const [periodo, setPeriodo] = useState<any>(null); const [open, setOpen] = useState(false);
-  const [manual, setManual] = useState<any>(null); const [manualRows, setManualRows] = useState<any[]>([]); const [resultadoPropuesta,setResultadoPropuesta]=useState<any>(null);
-  const [catalogo, setCatalogo] = useState<any[]>([]); const [casas, setCasas] = useState<any[]>([]); const [cuartos, setCuartos] = useState<any[]>([]);
+  const [items, setItems] = useState<any[]>([]);
+  const [error, setError] = useState("");
+  const [form, setForm] = useState<any>(initialForm);
+  const [editing, setEditing] = useState<any>(null);
+  const [periodo, setPeriodo] = useState<any>(null);
+  const [open, setOpen] = useState(false);
+  const [manual, setManual] = useState<any>(null);
+  const [manualRows, setManualRows] = useState<any[]>([]);
+  const [catalogo, setCatalogo] = useState<any[]>([]);
+  const [casas, setCasas] = useState<any[]>([]);
+  const [cuartos, setCuartos] = useState<any[]>([]);
   const [filtro, setFiltro] = useState("todos");
   const activos = catalogo.filter((s) => s.estado === "activo");
-  const cuartosCasa = useMemo(() => cuartos.filter((c) => String(c.id_casa) === String(form.id_casa)), [cuartos, form.id_casa]);
-  const selectedServicio = activos.find((s) => String(s.id_servicio) === String(form.id_servicio)) || catalogo.find((s) => String(s.id_servicio) === String(form.id_servicio)) || null;
-  const selectedCasa = casas.find((c) => String(c.id_casa) === String(form.id_casa)) || null;
-  const selectedCuarto = cuartosCasa.find((c) => String(c.id_cuarto) === String(form.id_cuarto)) || null;
-  const nombreServicio = (id:any) => catalogo.find((s) => String(s.id_servicio) === String(id))?.nombre_servicio || id;
-  const nombreCasa = (id:any) => casas.find((c) => String(c.id_casa) === String(id))?.nombre_casa || id;
-  const nombreCuarto = (id:any) => id ? (cuartos.find((c) => String(c.id_cuarto) === String(id))?.numero_cuarto || id) : "Casa completa";
-  const cuartoLabel = (c:any) => `${c.numero_cuarto || `Cuarto #${c.id_cuarto}`} — ${nombreCasa(c.id_casa)} — ${c.estado || "sin estado"} — ID #${c.id_cuarto}`;
-  const cuartoSearchText = (c:any) => [c.id_cuarto, c.numero_cuarto, c.descripcion, c.estado, nombreCasa(c.id_casa)].filter(Boolean).join(" ");
-  const formatRecordatorio = (estado: string) => ({ no_preparado: "Sin preparar", preparado: "Mensaje preparado", pendiente_confirmar_pago: "Pago reportado", sin_respuesta: "Sin respuesta" } as Record<string, string>)[estado] || estado;
-  const formatEstadoPago = (estado: string) => ({ pendiente: "Pendiente", pagado: "Pagado", vencido: "Vencido" } as Record<string, string>)[estado] || estado;
-  const rows = items.map((x) => ({ ...x, servicio: nombreServicio(x.id_servicio), casa: nombreCasa(x.id_casa), cuarto: nombreCuarto(x.id_cuarto), inmueble: `${nombreCasa(x.id_casa)} / ${nombreCuarto(x.id_cuarto)}`, alcance: x.id_cuarto ? "Cuarto específico" : "Casa completa", factura_pagada_por: x.pagador_factura === "inquilino_directo" ? "Inquilino directo" : "Propietario", costo_asignado_a: x.responsable_pago === "inquilino" ? "Inquilino" : "Propietario", monto_legible: `${x.monto} Bs`, estado_legible: formatEstadoPago(x.estado_pago), recordatorio: formatRecordatorio(x.estado_recordatorio || "no_preparado") }));
-  const load = async () => { try { setError(""); const [sm, sv, ca, cu] = await Promise.all([api.get(`/api/servicios-mensuales${idPeriodo ? `?id_periodo=${idPeriodo}` : ""}`), api.get("/api/servicios"), api.get("/api/casas"), api.get("/api/cuartos")]); const enriched = idPeriodo ? await Promise.all((sm.data || []).map(async (x:any) => { try { const {data}=await api.get(`/api/servicios-mensuales/${x.id_servicio_mensual}/distribuciones`); return {...x, manual_requerido: !data.resuelto || data.servicio?.manual_requerido}; } catch { return x; } })) : sm.data; setItems(enriched); setCatalogo(sv.data); setCasas(ca.data); setCuartos(cu.data); if (idPeriodo) { const p = await api.get(`/api/periodos/${idPeriodo}`); setPeriodo(p.data); } } catch (e: any) { setError(errorMessage(e)); } };
-  useEffect(() => { load(); }, [idPeriodo]);
-  const startCreate = () => { setEditing(null); setForm(initialForm); setOpen(true); };
-  const startEdit = (x: any) => { setEditing(x); setForm({ id_servicio: String(x.id_servicio), id_casa: String(x.id_casa), alcance: x.id_cuarto ? "cuarto" : "casa", id_cuarto: x.id_cuarto ? String(x.id_cuarto) : "", monto: String(x.monto), responsable_pago: x.responsable_pago, pagador_factura: x.pagador_factura || "propietario", estado_pago: x.estado_pago || "pendiente", metodo_pago: x.metodo_pago || "", fecha_pago: x.fecha_pago || "", numero_comprobante: x.numero_comprobante || "", observacion: x.observacion || "" }); setOpen(true); };
-  const openManual = async (x:any) => { try { setError(""); const { data } = await api.get(`/api/servicios-mensuales/${x.id_servicio_mensual}/distribuciones`); setManual(data); setManualRows(data.distribuciones.map((d:any)=>({ id_alquiler:d.id_alquiler, responsable:d.id_alquiler ? (d.inquilino || `Alquiler #${d.id_alquiler}`) : "Propietario", dias:d.dias_ocupados, sugerido:d.monto_sugerido, monto_asignado:d.monto_asignado, tipo:d.tipo_calculo }))); } catch(e:any){ setError(errorMessage(e)); } };
-  const saveManual = async () => { if (!manual) return; const suma = manualRows.reduce((a,r)=>a+Number(r.monto_asignado||0),0); if (Math.round((suma-Number(manual.monto_total))*100)!==0) { setError(`La distribución debe sumar exactamente ${manual.monto_total} Bs. Actualmente suma ${suma.toFixed(2)} Bs; diferencia ${(Number(manual.monto_total)-suma).toFixed(2)} Bs.`); return; } try { await api.put(`/api/servicios-mensuales/${manual.servicio.id_servicio_mensual}/distribuciones`, { distribuciones: manualRows.map(r=>({ id_alquiler:r.id_alquiler, monto_asignado:Number(r.monto_asignado) })) }); setManual(null); await load(); } catch(e:any){ setError(errorMessage(e)); } };
-  const proponer = async () => { if(!idPeriodo) return; try{ setError(""); const {data}=await api.post(`/api/servicios-mensuales/proponer-periodo/${idPeriodo}`); setResultadoPropuesta(data); await load(); } catch(e:any){ setError(errorMessage(e)); } };
-  const marcarRecordatorio = async (x:any, estado:string) => { try{ await api.post(`/api/servicios-mensuales/${x.id_servicio_mensual}/recordatorio`, {estado, observacion: estado==="pendiente_confirmar_pago" ? "El responsable indicó pago; falta confirmar manualmente." : "Contacto registrado manualmente."}); await load(); } catch(e:any){ setError(errorMessage(e)); } };
-  const requiereManual = rows.filter((x)=>x.manual_requerido || String(x.observacion||"").toLowerCase().includes("manual"));
+  const cuartosCasa = useMemo(
+    () => cuartos.filter((c) => String(c.id_casa) === String(form.id_casa)),
+    [cuartos, form.id_casa],
+  );
+  const selectedServicio =
+    activos.find((s) => String(s.id_servicio) === String(form.id_servicio)) ||
+    catalogo.find((s) => String(s.id_servicio) === String(form.id_servicio)) ||
+    null;
+  const selectedCasa =
+    casas.find((c) => String(c.id_casa) === String(form.id_casa)) || null;
+  const selectedCuarto =
+    cuartosCasa.find((c) => String(c.id_cuarto) === String(form.id_cuarto)) ||
+    null;
+  const nombreServicio = (id: any) =>
+    catalogo.find((s) => String(s.id_servicio) === String(id))
+      ?.nombre_servicio || id;
+  const nombreCasa = (id: any) =>
+    casas.find((c) => String(c.id_casa) === String(id))?.nombre_casa || id;
+  const nombreCuarto = (id: any) =>
+    id
+      ? cuartos.find((c) => String(c.id_cuarto) === String(id))
+          ?.numero_cuarto || id
+      : "Casa completa";
+  const cuartoLabel = (c: any) =>
+    `${c.numero_cuarto || `Cuarto #${c.id_cuarto}`} — ${nombreCasa(c.id_casa)} — ${c.estado || "sin estado"} — ID #${c.id_cuarto}`;
+  const cuartoSearchText = (c: any) =>
+    [
+      c.id_cuarto,
+      c.numero_cuarto,
+      c.descripcion,
+      c.estado,
+      nombreCasa(c.id_casa),
+    ]
+      .filter(Boolean)
+      .join(" ");
+  const formatRecordatorio = (estado: string) =>
+    (
+      ({
+        no_preparado: "Sin preparar",
+        preparado: "Mensaje preparado",
+        pendiente_confirmar_pago: "Pago reportado",
+        sin_respuesta: "Sin respuesta",
+      }) as Record<string, string>
+    )[estado] || estado;
+  const formatEstadoPago = (estado: string) =>
+    (
+      ({
+        pendiente: "Pendiente",
+        pagado: "Pagado",
+        vencido: "Vencido",
+      }) as Record<string, string>
+    )[estado] || estado;
+  const rows = items.map((x) => ({
+    ...x,
+    servicio: nombreServicio(x.id_servicio),
+    casa: nombreCasa(x.id_casa),
+    cuarto: nombreCuarto(x.id_cuarto),
+    inmueble: `${nombreCasa(x.id_casa)} / ${nombreCuarto(x.id_cuarto)}`,
+    alcance: x.id_cuarto ? "Cuarto específico" : "Casa completa",
+    factura_pagada_por:
+      x.pagador_factura === "inquilino_directo"
+        ? "Inquilino directo"
+        : "Propietario",
+    costo_asignado_a:
+      x.responsable_pago === "inquilino" ? "Inquilino" : "Propietario",
+    monto_legible: `${x.monto} Bs`,
+    estado_legible: formatEstadoPago(x.estado_pago),
+    recordatorio: formatRecordatorio(x.estado_recordatorio || "no_preparado"),
+  }));
+  const load = async () => {
+    try {
+      setError("");
+      const [sm, sv, ca, cu] = await Promise.all([
+        api.get(
+          `/api/servicios-mensuales${idPeriodo ? `?id_periodo=${idPeriodo}` : ""}`,
+        ),
+        api.get("/api/servicios"),
+        api.get("/api/casas"),
+        api.get("/api/cuartos"),
+      ]);
+      const enriched = idPeriodo
+        ? await Promise.all(
+            (sm.data || []).map(async (x: any) => {
+              try {
+                const { data } = await api.get(
+                  `/api/servicios-mensuales/${x.id_servicio_mensual}/distribuciones`,
+                );
+                return {
+                  ...x,
+                  manual_requerido:
+                    !data.resuelto || data.servicio?.manual_requerido,
+                };
+              } catch {
+                return x;
+              }
+            }),
+          )
+        : sm.data;
+      setItems(enriched);
+      setCatalogo(sv.data);
+      setCasas(ca.data);
+      setCuartos(cu.data);
+      if (idPeriodo) {
+        const p = await api.get(`/api/periodos/${idPeriodo}`);
+        setPeriodo(p.data);
+      }
+    } catch (e: any) {
+      setError(errorMessage(e));
+    }
+  };
+  useEffect(() => {
+    load();
+  }, [idPeriodo]);
+  const startEdit = (x: any) => {
+    setEditing(x);
+    setForm({
+      id_servicio: String(x.id_servicio),
+      id_casa: String(x.id_casa),
+      alcance: x.id_cuarto ? "cuarto" : "casa",
+      id_cuarto: x.id_cuarto ? String(x.id_cuarto) : "",
+      monto: String(x.monto),
+      responsable_pago: x.responsable_pago,
+      pagador_factura: x.pagador_factura || "propietario",
+      estado_pago: x.estado_pago || "pendiente",
+      metodo_pago: x.metodo_pago || "",
+      fecha_pago: x.fecha_pago || "",
+      numero_comprobante: x.numero_comprobante || "",
+      observacion: x.observacion || "",
+    });
+    setOpen(true);
+  };
+  const openManual = async (x: any) => {
+    try {
+      setError("");
+      const { data } = await api.get(
+        `/api/servicios-mensuales/${x.id_servicio_mensual}/distribuciones`,
+      );
+      setManual(data);
+      setManualRows(
+        data.distribuciones.map((d: any) => ({
+          id_alquiler: d.id_alquiler,
+          responsable: d.id_alquiler
+            ? d.inquilino || `Alquiler #${d.id_alquiler}`
+            : "Propietario",
+          dias: d.dias_ocupados,
+          sugerido: d.monto_sugerido,
+          monto_asignado: d.monto_asignado,
+          tipo: d.tipo_calculo,
+        })),
+      );
+    } catch (e: any) {
+      setError(errorMessage(e));
+    }
+  };
+  const saveManual = async () => {
+    if (!manual) return;
+    const suma = manualRows.reduce(
+      (a, r) => a + Number(r.monto_asignado || 0),
+      0,
+    );
+    if (Math.round((suma - Number(manual.monto_total)) * 100) !== 0) {
+      setError(
+        `La distribución debe sumar exactamente ${manual.monto_total} Bs. Actualmente suma ${suma.toFixed(2)} Bs; diferencia ${(Number(manual.monto_total) - suma).toFixed(2)} Bs.`,
+      );
+      return;
+    }
+    try {
+      await api.put(
+        `/api/servicios-mensuales/${manual.servicio.id_servicio_mensual}/distribuciones`,
+        {
+          distribuciones: manualRows.map((r) => ({
+            id_alquiler: r.id_alquiler,
+            monto_asignado: Number(r.monto_asignado),
+          })),
+        },
+      );
+      setManual(null);
+      await load();
+    } catch (e: any) {
+      setError(errorMessage(e));
+    }
+  };
+  const marcarRecordatorio = async (x: any, estado: string) => {
+    try {
+      await api.post(
+        `/api/servicios-mensuales/${x.id_servicio_mensual}/recordatorio`,
+        {
+          estado,
+          observacion:
+            estado === "pendiente_confirmar_pago"
+              ? "El responsable indicó pago; falta confirmar manualmente."
+              : "Contacto registrado manualmente.",
+        },
+      );
+      await load();
+    } catch (e: any) {
+      setError(errorMessage(e));
+    }
+  };
+  const requiereManual = rows.filter(
+    (x) =>
+      x.manual_requerido ||
+      String(x.observacion || "")
+        .toLowerCase()
+        .includes("manual"),
+  );
   const filtros = [
-    { id: "todos", label: "Todos", count: rows.length, match: (_: any) => true },
-    { id: "inquilino", label: "Se cobra al inquilino", count: rows.filter((x)=>x.responsable_pago==="inquilino").length, match: (x: any) => x.responsable_pago === "inquilino" },
-    { id: "propietario", label: "Lo asume propietario", count: rows.filter((x)=>x.responsable_pago==="propietario").length, match: (x: any) => x.responsable_pago === "propietario" },
-    { id: "pendientes", label: "Pendientes", count: rows.filter((x)=>x.estado_pago==="pendiente").length, match: (x: any) => x.estado_pago === "pendiente" },
-    { id: "pagados", label: "Pagados", count: rows.filter((x)=>x.estado_pago==="pagado").length, match: (x: any) => x.estado_pago === "pagado" },
-    { id: "revision", label: "Requiere revisión", count: requiereManual.length, match: (x: any) => x.manual_requerido || String(x.observacion||"").toLowerCase().includes("manual") },
+    {
+      id: "todos",
+      label: "Todos",
+      count: rows.length,
+      match: (_: any) => true,
+    },
+    {
+      id: "inquilino",
+      label: "Se cobra al inquilino",
+      count: rows.filter((x) => x.responsable_pago === "inquilino").length,
+      match: (x: any) => x.responsable_pago === "inquilino",
+    },
+    {
+      id: "propietario",
+      label: "Lo asume propietario",
+      count: rows.filter((x) => x.responsable_pago === "propietario").length,
+      match: (x: any) => x.responsable_pago === "propietario",
+    },
+    {
+      id: "pendientes",
+      label: "Pendientes",
+      count: rows.filter((x) => x.estado_pago === "pendiente").length,
+      match: (x: any) => x.estado_pago === "pendiente",
+    },
+    {
+      id: "pagados",
+      label: "Pagados",
+      count: rows.filter((x) => x.estado_pago === "pagado").length,
+      match: (x: any) => x.estado_pago === "pagado",
+    },
+    {
+      id: "revision",
+      label: "Requiere revisión",
+      count: requiereManual.length,
+      match: (x: any) =>
+        x.manual_requerido ||
+        String(x.observacion || "")
+          .toLowerCase()
+          .includes("manual"),
+    },
   ];
   const filtroActivo = filtros.find((x) => x.id === filtro) || filtros[0];
   const rowsFiltradas = rows.filter(filtroActivo.match);
-  const create = async (e: React.FormEvent) => { e.preventDefault(); if (!idPeriodo) { setError("Para registrar servicios mensuales, primero selecciona un periodo."); return; } if (form.alcance === "casa" && form.responsable_pago === "inquilino") { setError("Todavía no está habilitada la distribución de servicios generales entre varios inquilinos. Seleccione un cuarto específico o cambie el responsable a propietario."); return; } try { const payload: any = { ...form, id_periodo: Number(idPeriodo), id_cuarto: form.alcance === "casa" ? null : Number(form.id_cuarto) }; delete payload.alcance; ["id_servicio", "id_casa", "monto"].forEach((k) => payload[k] = payload[k] === "" ? null : Number(payload[k])); Object.keys(payload).forEach((k) => { if (payload[k] === "") payload[k] = null; }); if (editing) await api.put(`/api/servicios-mensuales/${editing.id_servicio_mensual}`, payload); else await api.post("/api/servicios-mensuales", payload); setEditing(null); setForm(initialForm); setOpen(false); await load(); } catch (e: any) { setError(errorMessage(e)); } };
-  if (!idPeriodo) return <div className="page"><PageHeader breadcrumbs={[{ label: "FINANZAS / COBRANZA" }, { label: "Servicios" }]} title="Servicios" description="Entrada general deshabilitada: selecciona un periodo para ver sus servicios." action={<Link className="btn btn-primary" to="/periodos">Ir a periodos</Link>} /><ErrorMessage message={error}/><ContextHelp message="Para revisar servicios, primero selecciona un periodo." to="/periodos" label="Ir a periodos"/></div>;
-  const breadcrumbs: BreadcrumbItem[] = [{ label: "FINANZAS / COBRANZA", to: "/periodos" }, { label: periodo?.nombre_periodo || `Periodo #${idPeriodo}`, to: `/periodos/${idPeriodo}/trabajo-mensual` }, { label: "Servicios" }];
-  return <div className="page"><PageHeader breadcrumbs={breadcrumbs} title="Servicios del periodo" description="El periodo se toma automáticamente; cada servicio aparece una sola vez y puede filtrarse por estado o responsable." action={<button className="btn btn-primary" onClick={proponer}>Cargar servicios configurados</button>} secondaryAction={<><button className="btn btn-secondary" onClick={startCreate}>Registro manual avanzado</button><Link className="btn btn-secondary" to={`/periodos/${idPeriodo}/trabajo-mensual`}>Alquileres</Link></>} /><ErrorMessage message={error}/><PeriodoActualTabs idPeriodo={idPeriodo} active="servicios" />{resultadoPropuesta&&<Card title="Resultado de carga de servicios"><div className="stats-grid"><div className="stat-card green"><span className="stat-label">Servicios cargados</span><strong className="stat-value">{resultadoPropuesta.servicios_creados}</strong></div><div className="stat-card orange"><span className="stat-label">Ya existían / no aplican</span><strong className="stat-value">{resultadoPropuesta.servicios_omitidos}</strong></div><div className="stat-card purple"><span className="stat-label">Requieren revisión</span><strong className="stat-value">{resultadoPropuesta.errores?.length||0}</strong></div></div>{resultadoPropuesta.errores?.map((x:string)=><p className="text-danger" key={x}>{x}</p>)}</Card>}<div className="stats-grid"><div className="stat-card blue"><span className="stat-label">Servicios del periodo</span><strong className="stat-value">{rows.length}</strong></div><div className="stat-card orange"><span className="stat-label">Se cobra al inquilino</span><strong className="stat-value">{rows.filter(x=>x.responsable_pago==="inquilino").length}</strong></div><div className="stat-card purple"><span className="stat-label">Lo asume propietario</span><strong className="stat-value">{rows.filter(x=>x.responsable_pago==="propietario").length}</strong></div><div className="stat-card green"><span className="stat-label">Pagados</span><strong className="stat-value">{rows.filter(x=>x.estado_pago==="pagado").length}</strong></div><div className="stat-card orange"><span className="stat-label">Requieren revisión</span><strong className="stat-value">{requiereManual.length}</strong></div></div><Card title="Servicios del periodo" description="Filtra la lista sin duplicar servicios entre secciones."><div className="action-row" style={{ marginBottom: 16 }}>{filtros.map((f)=><button key={f.id} className={`btn btn-sm ${filtro===f.id?"btn-primary":"btn-secondary"}`} onClick={()=>setFiltro(f.id)}>{f.label} ({f.count})</button>)}</div><DataTable rows={rowsFiltradas} columns={["servicio", "inmueble", "costo_asignado_a", "factura_pagada_por", "monto_legible", "estado_legible", "recordatorio"]} getKey={(r)=>r.id_servicio_mensual} emptyState={<EmptyState title="No hay servicios para este filtro." description="Cambia el filtro o carga servicios configurados para el periodo." action={<button className="btn btn-primary" onClick={proponer}>Cargar servicios configurados</button>} secondaryAction={<button className="btn btn-secondary" onClick={startCreate}>Registro manual avanzado</button>} icon="💡" />} actions={(x) => <RowActionsMenu items={[{ label: "Mensaje preparado", onClick: () => marcarRecordatorio(x,"preparado") }, { label: "Pago reportado", onClick: () => marcarRecordatorio(x,"pendiente_confirmar_pago") }, { label: "Distribución manual", onClick: () => openManual(x) }, { label: "Editar", onClick: () => startEdit(x) }, { label: "Anular", danger: true, onClick: async () => { await api.post(`/api/servicios-mensuales/${x.id_servicio_mensual}/anular`); await load(); } }]} />} /></Card><Drawer open={open} title={editing ? "Editar servicio del periodo" : "Registro manual avanzado"} description="Selecciona servicio, casa y alcance. Distingue quién pagó la factura de a quién se le asignará el costo." onClose={() => { setOpen(false); setEditing(null); }} footer={<FormActions formId="servicio-mensual-form" onCancel={() => { setOpen(false); setEditing(null); }} submitLabel={editing ? "Guardar cambios" : "Guardar servicio"} />}><ContextSummary items={[{ label: "Periodo", value: periodo?.nombre_periodo || `Periodo #${idPeriodo}` }]} /><form id="servicio-mensual-form" onSubmit={create} className="form-grid" style={{ marginTop: 16 }}><SearchSelect label="Servicio activo" required items={activos} selectedItem={selectedServicio} onSelect={(s)=>setForm({...form,id_servicio:s?String(s.id_servicio):""})} getKey={(s)=>s.id_servicio} getOptionLabel={servicioLabel} getSelectedLabel={servicioLabel} getSearchText={servicioSearchText} placeholder="Buscar por nombre, descripción, estado o ID..." emptyItemsMessage="No hay servicios activos." noResultsMessage="No se encontraron servicios." /><SearchSelect label="Casa" required items={casas} selectedItem={selectedCasa} onSelect={(c)=>setForm({...form,id_casa:c?String(c.id_casa):"",id_cuarto:""})} getKey={(c)=>c.id_casa} getOptionLabel={casaLabel} getSelectedLabel={casaLabel} getSearchText={casaSearchText} placeholder="Buscar por nombre, dirección, zona, ciudad, estado o ID..." emptyItemsMessage="No hay casas registradas." noResultsMessage="No se encontraron casas." /><FormSelect label="Aplica a" required value={form.alcance} options={[{ label: "Cuarto específico", value: "cuarto" }, { label: "Casa completa", value: "casa" }]} onChange={(v) => setForm({ ...form, alcance: v, id_cuarto: "", responsable_pago: v === "casa" ? "propietario" : form.responsable_pago })} />{form.alcance === "cuarto" && <SearchSelect label="Cuarto" required items={cuartosCasa} selectedItem={selectedCuarto} onSelect={(c)=>setForm({...form,id_cuarto:c?String(c.id_cuarto):""})} getKey={(c)=>c.id_cuarto} getOptionLabel={cuartoLabel} getSelectedLabel={cuartoLabel} getSearchText={cuartoSearchText} placeholder="Buscar por número, estado, casa o ID..." emptyItemsMessage="Esta casa no tiene cuartos." noResultsMessage="No se encontraron cuartos." disabled={!form.id_casa} disabledMessage="Selecciona una casa antes de buscar cuartos." />}<FormInput label="Monto" required value={form.monto} onChange={(v) => setForm({ ...form, monto: v })} /><FormSelect label="Factura pagada por" required value={form.pagador_factura} options={[{ label: "Propietario", value: "propietario" }, { label: "Inquilino directo", value: "inquilino_directo" }]} onChange={(v) => setForm({ ...form, pagador_factura: v })} /><FormSelect label="Asignar costo a" required value={form.responsable_pago} options={[{ label: "Inquilino", value: "inquilino" }, { label: "Propietario", value: "propietario" }]} onChange={(v) => setForm({ ...form, responsable_pago: v })} /><FormInput label="Método de pago" value={form.metodo_pago} onChange={(v) => setForm({ ...form, metodo_pago: v })} /><FormInput label="Fecha de pago" value={form.fecha_pago} onChange={(v) => setForm({ ...form, fecha_pago: v })} /><FormInput label="Número de comprobante" value={form.numero_comprobante} onChange={(v) => setForm({ ...form, numero_comprobante: v })} /><FormInput label="Observación" value={form.observacion} onChange={(v) => setForm({ ...form, observacion: v })} /></form></Drawer><Drawer open={!!manual} title="Resolver distribución manual" description="Los montos deben sumar exactamente la factura." onClose={() => setManual(null)} footer={<div className="form-actions modal-actions"><button className="btn btn-secondary" onClick={() => setManual(null)}>Cancelar</button><button className="btn btn-primary" onClick={saveManual}>Guardar distribución</button></div>}>{manual && <div className="page"><ContextSummary items={[{ label: "Servicio", value: nombreServicio(manual.servicio.id_servicio) }, { label: "Casa", value: nombreCasa(manual.servicio.id_casa) }, { label: "Cuarto", value: nombreCuarto(manual.servicio.id_cuarto) }, { label: "Factura", value: `${manual.monto_total} Bs` }, { label: "Diferencia", value: `${(Number(manual.monto_total)-manualRows.reduce((a,r)=>a+Number(r.monto_asignado||0),0)).toFixed(2)} Bs` }]} /><div className="table-wrap"><table className="data-table"><thead><tr><th>Responsable</th><th>Días</th><th>Sugerido</th><th>Tipo</th><th>Monto final</th></tr></thead><tbody>{manualRows.map((r,i)=><tr key={i}><td>{r.responsable}</td><td>{r.dias}</td><td>{r.sugerido} Bs</td><td>{r.tipo}</td><td><input className="input" type="number" min="0" step="0.01" value={r.monto_asignado} onChange={(e)=>setManualRows(manualRows.map((x,j)=>j===i?{...x,monto_asignado:e.target.value}:x))}/></td></tr>)}</tbody></table></div></div>}</Drawer></div>;
+  const create = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!idPeriodo) {
+      setError(
+        "Para registrar servicios mensuales, primero selecciona un periodo.",
+      );
+      return;
+    }
+    if (form.alcance === "casa" && form.responsable_pago === "inquilino") {
+      setError(
+        "Todavía no está habilitada la distribución de servicios generales entre varios inquilinos. Seleccione un cuarto específico o cambie el responsable a propietario.",
+      );
+      return;
+    }
+    try {
+      const payload: any = {
+        ...form,
+        id_periodo: Number(idPeriodo),
+        id_cuarto: form.alcance === "casa" ? null : Number(form.id_cuarto),
+      };
+      delete payload.alcance;
+      ["id_servicio", "id_casa", "monto"].forEach(
+        (k) => (payload[k] = payload[k] === "" ? null : Number(payload[k])),
+      );
+      Object.keys(payload).forEach((k) => {
+        if (payload[k] === "") payload[k] = null;
+      });
+      if (!editing) return;
+      await api.put(
+        `/api/servicios-mensuales/${editing.id_servicio_mensual}`,
+        payload,
+      );
+      setEditing(null);
+      setForm(initialForm);
+      setOpen(false);
+      await load();
+    } catch (e: any) {
+      setError(errorMessage(e));
+    }
+  };
+  if (!idPeriodo)
+    return (
+      <div className="page">
+        <PageHeader
+          breadcrumbs={[
+            { label: "FINANZAS / COBRANZA" },
+            { label: "Servicios" },
+          ]}
+          title="Servicios"
+          description="Entrada general deshabilitada: selecciona un periodo para ver sus servicios."
+          action={
+            <Link className="btn btn-primary" to="/periodos">
+              Ir a periodos
+            </Link>
+          }
+        />
+        <ErrorMessage message={error} />
+        <ContextHelp
+          message="Para revisar servicios, primero selecciona un periodo."
+          to="/periodos"
+          label="Ir a periodos"
+        />
+      </div>
+    );
+  const breadcrumbs: BreadcrumbItem[] = [
+    { label: "FINANZAS / COBRANZA", to: "/periodos" },
+    {
+      label: periodo?.nombre_periodo || `Periodo #${idPeriodo}`,
+      to: `/periodos/${idPeriodo}/trabajo-mensual`,
+    },
+    { label: "Servicios" },
+  ];
+  return (
+    <div className="page">
+      <PageHeader
+        breadcrumbs={breadcrumbs}
+        title="Servicios del periodo"
+        description="El periodo se toma automáticamente; cada servicio aparece una sola vez y puede filtrarse por estado o responsable."
+      />
+      <ErrorMessage message={error} />
+      <PeriodoActualTabs idPeriodo={idPeriodo} active="servicios" />
+      <div className="stats-grid">
+        <div className="stat-card blue">
+          <span className="stat-label">Servicios del periodo</span>
+          <strong className="stat-value">{rows.length}</strong>
+        </div>
+        <div className="stat-card orange">
+          <span className="stat-label">Se cobra al inquilino</span>
+          <strong className="stat-value">
+            {rows.filter((x) => x.responsable_pago === "inquilino").length}
+          </strong>
+        </div>
+        <div className="stat-card purple">
+          <span className="stat-label">Lo asume propietario</span>
+          <strong className="stat-value">
+            {rows.filter((x) => x.responsable_pago === "propietario").length}
+          </strong>
+        </div>
+        <div className="stat-card green">
+          <span className="stat-label">Pagados</span>
+          <strong className="stat-value">
+            {rows.filter((x) => x.estado_pago === "pagado").length}
+          </strong>
+        </div>
+        <div className="stat-card orange">
+          <span className="stat-label">Requieren revisión</span>
+          <strong className="stat-value">{requiereManual.length}</strong>
+        </div>
+      </div>
+      <Card
+        title="Servicios del periodo"
+        description="Filtra la lista sin duplicar servicios entre secciones."
+      >
+        <div className="action-row" style={{ marginBottom: 16 }}>
+          {filtros.map((f) => (
+            <button
+              key={f.id}
+              className={`btn btn-sm ${filtro === f.id ? "btn-primary" : "btn-secondary"}`}
+              onClick={() => setFiltro(f.id)}
+            >
+              {f.label} ({f.count})
+            </button>
+          ))}
+        </div>
+        <DataTable
+          rows={rowsFiltradas}
+          columns={[
+            "servicio",
+            "inmueble",
+            "costo_asignado_a",
+            "factura_pagada_por",
+            "monto_legible",
+            "estado_legible",
+            "recordatorio",
+          ]}
+          getKey={(r) => r.id_servicio_mensual}
+          emptyState={
+            <EmptyState
+              title="No hay servicios para este filtro."
+              description="Cambia el filtro para revisar los servicios visibles del periodo."
+              icon="💡"
+            />
+          }
+          actions={(x) => (
+            <RowActionsMenu
+              items={[
+                {
+                  label: "Mensaje preparado",
+                  onClick: () => marcarRecordatorio(x, "preparado"),
+                },
+                {
+                  label: "Pago reportado",
+                  onClick: () =>
+                    marcarRecordatorio(x, "pendiente_confirmar_pago"),
+                },
+                { label: "Distribución manual", onClick: () => openManual(x) },
+                { label: "Editar", onClick: () => startEdit(x) },
+                {
+                  label: "Anular",
+                  danger: true,
+                  onClick: async () => {
+                    await api.post(
+                      `/api/servicios-mensuales/${x.id_servicio_mensual}/anular`,
+                    );
+                    await load();
+                  },
+                },
+              ]}
+            />
+          )}
+        />
+      </Card>
+      <Drawer
+        open={open}
+        title="Editar servicio del periodo"
+        description="Selecciona servicio, casa y alcance. Distingue quién pagó la factura de a quién se le asignará el costo."
+        onClose={() => {
+          setOpen(false);
+          setEditing(null);
+        }}
+        footer={
+          <FormActions
+            formId="servicio-mensual-form"
+            onCancel={() => {
+              setOpen(false);
+              setEditing(null);
+            }}
+            submitLabel="Guardar cambios"
+          />
+        }
+      >
+        <ContextSummary
+          items={[
+            {
+              label: "Periodo",
+              value: periodo?.nombre_periodo || `Periodo #${idPeriodo}`,
+            },
+          ]}
+        />
+        <form
+          id="servicio-mensual-form"
+          onSubmit={create}
+          className="form-grid"
+          style={{ marginTop: 16 }}
+        >
+          <SearchSelect
+            label="Servicio activo"
+            required
+            items={activos}
+            selectedItem={selectedServicio}
+            onSelect={(s) =>
+              setForm({ ...form, id_servicio: s ? String(s.id_servicio) : "" })
+            }
+            getKey={(s) => s.id_servicio}
+            getOptionLabel={servicioLabel}
+            getSelectedLabel={servicioLabel}
+            getSearchText={servicioSearchText}
+            placeholder="Buscar por nombre, descripción, estado o ID..."
+            emptyItemsMessage="No hay servicios activos."
+            noResultsMessage="No se encontraron servicios."
+          />
+          <SearchSelect
+            label="Casa"
+            required
+            items={casas}
+            selectedItem={selectedCasa}
+            onSelect={(c) =>
+              setForm({
+                ...form,
+                id_casa: c ? String(c.id_casa) : "",
+                id_cuarto: "",
+              })
+            }
+            getKey={(c) => c.id_casa}
+            getOptionLabel={casaLabel}
+            getSelectedLabel={casaLabel}
+            getSearchText={casaSearchText}
+            placeholder="Buscar por nombre, dirección, zona, ciudad, estado o ID..."
+            emptyItemsMessage="No hay casas registradas."
+            noResultsMessage="No se encontraron casas."
+          />
+          <FormSelect
+            label="Aplica a"
+            required
+            value={form.alcance}
+            options={[
+              { label: "Cuarto específico", value: "cuarto" },
+              { label: "Casa completa", value: "casa" },
+            ]}
+            onChange={(v) =>
+              setForm({
+                ...form,
+                alcance: v,
+                id_cuarto: "",
+                responsable_pago:
+                  v === "casa" ? "propietario" : form.responsable_pago,
+              })
+            }
+          />
+          {form.alcance === "cuarto" && (
+            <SearchSelect
+              label="Cuarto"
+              required
+              items={cuartosCasa}
+              selectedItem={selectedCuarto}
+              onSelect={(c) =>
+                setForm({ ...form, id_cuarto: c ? String(c.id_cuarto) : "" })
+              }
+              getKey={(c) => c.id_cuarto}
+              getOptionLabel={cuartoLabel}
+              getSelectedLabel={cuartoLabel}
+              getSearchText={cuartoSearchText}
+              placeholder="Buscar por número, estado, casa o ID..."
+              emptyItemsMessage="Esta casa no tiene cuartos."
+              noResultsMessage="No se encontraron cuartos."
+              disabled={!form.id_casa}
+              disabledMessage="Selecciona una casa antes de buscar cuartos."
+            />
+          )}
+          <FormInput
+            label="Monto"
+            required
+            value={form.monto}
+            onChange={(v) => setForm({ ...form, monto: v })}
+          />
+          <FormSelect
+            label="Factura pagada por"
+            required
+            value={form.pagador_factura}
+            options={[
+              { label: "Propietario", value: "propietario" },
+              { label: "Inquilino directo", value: "inquilino_directo" },
+            ]}
+            onChange={(v) => setForm({ ...form, pagador_factura: v })}
+          />
+          <FormSelect
+            label="Asignar costo a"
+            required
+            value={form.responsable_pago}
+            options={[
+              { label: "Inquilino", value: "inquilino" },
+              { label: "Propietario", value: "propietario" },
+            ]}
+            onChange={(v) => setForm({ ...form, responsable_pago: v })}
+          />
+          <FormInput
+            label="Método de pago"
+            value={form.metodo_pago}
+            onChange={(v) => setForm({ ...form, metodo_pago: v })}
+          />
+          <FormInput
+            label="Fecha de pago"
+            value={form.fecha_pago}
+            onChange={(v) => setForm({ ...form, fecha_pago: v })}
+          />
+          <FormInput
+            label="Número de comprobante"
+            value={form.numero_comprobante}
+            onChange={(v) => setForm({ ...form, numero_comprobante: v })}
+          />
+          <FormInput
+            label="Observación"
+            value={form.observacion}
+            onChange={(v) => setForm({ ...form, observacion: v })}
+          />
+        </form>
+      </Drawer>
+      <Drawer
+        open={!!manual}
+        title="Resolver distribución manual"
+        description="Los montos deben sumar exactamente la factura."
+        onClose={() => setManual(null)}
+        footer={
+          <div className="form-actions modal-actions">
+            <button
+              className="btn btn-secondary"
+              onClick={() => setManual(null)}
+            >
+              Cancelar
+            </button>
+            <button className="btn btn-primary" onClick={saveManual}>
+              Guardar distribución
+            </button>
+          </div>
+        }
+      >
+        {manual && (
+          <div className="page">
+            <ContextSummary
+              items={[
+                {
+                  label: "Servicio",
+                  value: nombreServicio(manual.servicio.id_servicio),
+                },
+                { label: "Casa", value: nombreCasa(manual.servicio.id_casa) },
+                {
+                  label: "Cuarto",
+                  value: nombreCuarto(manual.servicio.id_cuarto),
+                },
+                { label: "Factura", value: `${manual.monto_total} Bs` },
+                {
+                  label: "Diferencia",
+                  value: `${(Number(manual.monto_total) - manualRows.reduce((a, r) => a + Number(r.monto_asignado || 0), 0)).toFixed(2)} Bs`,
+                },
+              ]}
+            />
+            <div className="table-wrap">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Responsable</th>
+                    <th>Días</th>
+                    <th>Sugerido</th>
+                    <th>Tipo</th>
+                    <th>Monto final</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {manualRows.map((r, i) => (
+                    <tr key={i}>
+                      <td>{r.responsable}</td>
+                      <td>{r.dias}</td>
+                      <td>{r.sugerido} Bs</td>
+                      <td>{r.tipo}</td>
+                      <td>
+                        <input
+                          className="input"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={r.monto_asignado}
+                          onChange={(e) =>
+                            setManualRows(
+                              manualRows.map((x, j) =>
+                                j === i
+                                  ? { ...x, monto_asignado: e.target.value }
+                                  : x,
+                              ),
+                            )
+                          }
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </Drawer>
+    </div>
+  );
 }
